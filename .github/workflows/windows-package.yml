@@ -1,0 +1,59 @@
+name: Windows Package
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'lib/**'
+      - 'pubspec.yaml'
+      - 'l10n.yaml'
+      - 'windows/**'
+      - '.github/workflows/windows-package.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Generate Windows runner
+        run: flutter create . --platforms=windows
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Generate localizations
+        run: flutter gen-l10n
+
+      - name: Build Windows release
+        run: flutter build windows --release
+
+      - name: Package application
+        shell: pwsh
+        run: |
+          $release = 'build/windows/x64/runner/Release'
+          Compress-Archive `
+            -Path "$release/*" `
+            -DestinationPath 'weekra-windows-x64.zip' `
+            -Force
+
+      - name: Upload Windows package
+        uses: actions/upload-artifact@v4
+        with:
+          name: weekra-windows-x64
+          path: weekra-windows-x64.zip
+          if-no-files-found: error
+          retention-days: 14

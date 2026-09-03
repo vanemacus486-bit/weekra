@@ -27,6 +27,12 @@ flutter pub get
 flutter run
 ```
 
+## Windows package
+
+The `Windows Package` workflow builds a ready-to-run x64 archive. Download the
+`weekra-windows-x64` artifact, extract the complete folder, and open
+`weekra.exe`. Keep the DLL and `data` files beside the executable.
+
 ## Current progress
 
 The first UI slice is in place:
