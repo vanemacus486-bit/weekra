@@ -7,7 +7,7 @@ with minimal interaction.
 
 ## Included in v0.1
 
-1. A seven-day week view with an hourly vertical timeline.
+1. A seven-day week view with switchable Grid summary and Hourly layouts.
 2. Current-time indicator and clear emphasis on today.
 3. Previous/next week navigation and a return-to-today action.
 4. Event creation, editing, movement, resizing, and deletion.
@@ -37,4 +37,3 @@ illustrations, written copy, or other protected brand assets.
 - The user can identify free time in the current week without opening an event.
 - Week navigation and event manipulation remain smooth on the target devices.
 - Core calendar behavior works fully offline.
-

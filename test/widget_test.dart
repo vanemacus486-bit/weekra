@@ -20,6 +20,36 @@ void main() {
     expect(find.byType(FloatingActionButton), findsOneWidget);
   });
 
+  testWidgets('switches between Grid and Hourly on a phone', (tester) async {
+    _useViewport(tester, const Size(390, 844));
+    final store = _MemoryEventStore([
+      _eventAtStartOfWeek('Mobile week event'),
+    ]);
+    await tester.pumpWidget(
+      WeekraApp(
+        eventStore: store,
+        locale: const Locale('en'),
+        enableAutomaticUpdates: false,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('week-grid-layout')), findsOneWidget);
+    expect(find.byKey(const Key('week-hourly-layout')), findsNothing);
+
+    await tester.tap(find.byKey(const Key('week-layout-hourly')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('week-hourly-layout')), findsOneWidget);
+    expect(find.text('Mobile week event'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('week-layout-grid')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('week-grid-layout')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('creates and saves an event', (tester) async {
     final store = _MemoryEventStore();
     await tester.pumpWidget(

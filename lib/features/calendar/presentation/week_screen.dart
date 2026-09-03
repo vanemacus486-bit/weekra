@@ -10,6 +10,8 @@ const _ink = Color(0xFFF7F3EF);
 const _mutedInk = Color(0xFFA9A6A3);
 const _line = Color(0x24FFFFFF);
 
+enum _WeekLayout { hourly, grid }
+
 class WeekScreen extends StatefulWidget {
   const WeekScreen({
     super.key,
@@ -24,9 +26,11 @@ class WeekScreen extends StatefulWidget {
 
 class _WeekScreenState extends State<WeekScreen> {
   late DateTime _weekStart;
+  _WeekLayout _layout = _WeekLayout.grid;
   List<CalendarEvent> _events = [];
   bool _isLoading = true;
   bool _didStartLoading = false;
+  bool _didChooseInitialLayout = false;
   String? _storageError;
 
   @override
@@ -38,6 +42,12 @@ class _WeekScreenState extends State<WeekScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    if (!_didChooseInitialLayout) {
+      _layout = MediaQuery.sizeOf(context).width >= 760
+          ? _WeekLayout.hourly
+          : _WeekLayout.grid;
+      _didChooseInitialLayout = true;
+    }
     if (_didStartLoading) {
       return;
     }
@@ -157,6 +167,13 @@ class _WeekScreenState extends State<WeekScreen> {
     });
   }
 
+  void _setLayout(_WeekLayout layout) {
+    if (_layout == layout) {
+      return;
+    }
+    setState(() => _layout = layout);
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -184,9 +201,11 @@ class _WeekScreenState extends State<WeekScreen> {
             children: [
               _WeekToolbar(
                 weekStart: _weekStart,
+                layout: _layout,
                 onPrevious: () => _moveWeek(-1),
                 onNext: () => _moveWeek(1),
                 onToday: _returnToToday,
+                onLayoutChanged: _setLayout,
               ),
               if (_storageError != null)
                 _StorageErrorBanner(
@@ -197,35 +216,34 @@ class _WeekScreenState extends State<WeekScreen> {
                 child: _isLoading
                     ? const Center(child: CircularProgressIndicator())
                     : GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onHorizontalDragEnd: (details) {
-                    final velocity = details.primaryVelocity ?? 0;
-                    if (velocity.abs() < 350) {
-                      return;
-                    }
-                    _moveWeek(velocity < 0 ? 1 : -1);
-                  },
-                  child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 240),
-                    child: LayoutBuilder(
-                      key: ValueKey(_weekStart),
-                      builder: (context, constraints) {
-                        if (constraints.maxWidth >= 760) {
-                          return _WeekGrid(
-                            days: days,
-                            events: events,
-                            onEventTap: _openEvent,
-                          );
-                        }
-                        return _WeekAgenda(
-                          days: days,
-                          events: events,
-                          onEventTap: _openEvent,
-                        );
-                      },
-                    ),
-                  ),
-                ),
+                        behavior: HitTestBehavior.opaque,
+                        onHorizontalDragEnd: (details) {
+                          final velocity = details.primaryVelocity ?? 0;
+                          if (velocity.abs() < 350) {
+                            return;
+                          }
+                          _moveWeek(velocity < 0 ? 1 : -1);
+                        },
+                        child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 240),
+                          switchInCurve: Curves.easeOutCubic,
+                          switchOutCurve: Curves.easeInCubic,
+                          child: KeyedSubtree(
+                            key: ValueKey((_weekStart, _layout)),
+                            child: _layout == _WeekLayout.hourly
+                                ? _WeekHourlyLayout(
+                                    days: days,
+                                    events: events,
+                                    onEventTap: _openEvent,
+                                  )
+                                : _WeekGridSummary(
+                                    days: days,
+                                    events: events,
+                                    onEventTap: _openEvent,
+                                  ),
+                          ),
+                        ),
+                      ),
               ),
             ],
           ),
@@ -338,15 +356,19 @@ class _StorageErrorBanner extends StatelessWidget {
 class _WeekToolbar extends StatelessWidget {
   const _WeekToolbar({
     required this.weekStart,
+    required this.layout,
     required this.onPrevious,
     required this.onNext,
     required this.onToday,
+    required this.onLayoutChanged,
   });
 
   final DateTime weekStart;
+  final _WeekLayout layout;
   final VoidCallback onPrevious;
   final VoidCallback onNext;
   final VoidCallback onToday;
+  final ValueChanged<_WeekLayout> onLayoutChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -384,7 +406,7 @@ class _WeekToolbar extends StatelessWidget {
       ],
     );
 
-    final controls = Wrap(
+    final navigation = Wrap(
       alignment: WrapAlignment.end,
       crossAxisAlignment: WrapCrossAlignment.center,
       spacing: 2,
@@ -412,30 +434,40 @@ class _WeekToolbar extends StatelessWidget {
     );
 
     return Padding(
-      padding: const EdgeInsetsDirectional.fromSTEB(22, 18, 14, 14),
+      padding: const EdgeInsetsDirectional.fromSTEB(22, 18, 14, 12),
       child: LayoutBuilder(
         builder: (context, constraints) {
           final scaledBody = MediaQuery.textScalerOf(context).scale(16);
           final shouldStack = constraints.maxWidth < 440 || scaledBody > 21;
-          if (shouldStack) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+          final switcher = SizedBox(
+            width: math.min(constraints.maxWidth, 300),
+            child: _WeekLayoutSwitcher(
+              layout: layout,
+              onChanged: onLayoutChanged,
+            ),
+          );
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (shouldStack) ...[
                 heading,
-                const SizedBox(height: 8),
+                const SizedBox(height: 4),
                 Align(
                   alignment: AlignmentDirectional.centerEnd,
-                  child: controls,
+                  child: navigation,
                 ),
-              ],
-            );
-          }
-          return Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Expanded(child: heading),
-              const SizedBox(width: 8),
-              Flexible(child: controls),
+              ] else
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Expanded(child: heading),
+                    const SizedBox(width: 8),
+                    Flexible(child: navigation),
+                  ],
+                ),
+              const SizedBox(height: 10),
+              switcher,
             ],
           );
         },
@@ -444,8 +476,123 @@ class _WeekToolbar extends StatelessWidget {
   }
 }
 
-class _WeekAgenda extends StatelessWidget {
-  const _WeekAgenda({
+class _WeekLayoutSwitcher extends StatelessWidget {
+  const _WeekLayoutSwitcher({
+    required this.layout,
+    required this.onChanged,
+  });
+
+  final _WeekLayout layout;
+  final ValueChanged<_WeekLayout> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return Semantics(
+      container: true,
+      label: l10n.weekLayoutPickerLabel,
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 42),
+        padding: const EdgeInsets.all(3),
+        decoration: BoxDecoration(
+          color: const Color(0x66000000),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: _line),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: _WeekLayoutOption(
+                key: const Key('week-layout-hourly'),
+                icon: Icons.view_week_outlined,
+                label: l10n.weekLayoutHourly,
+                selected: layout == _WeekLayout.hourly,
+                onTap: () => onChanged(_WeekLayout.hourly),
+              ),
+            ),
+            Expanded(
+              child: _WeekLayoutOption(
+                key: const Key('week-layout-grid'),
+                icon: Icons.grid_view_rounded,
+                label: l10n.weekLayoutGrid,
+                selected: layout == _WeekLayout.grid,
+                onTap: () => onChanged(_WeekLayout.grid),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _WeekLayoutOption extends StatelessWidget {
+  const _WeekLayoutOption({
+    super.key,
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final contentColor = selected ? const Color(0xFF17181C) : _mutedInk;
+    return Semantics(
+      button: true,
+      selected: selected,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(20),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeOutCubic,
+            constraints: const BoxConstraints(minHeight: 36),
+            padding: const EdgeInsetsDirectional.symmetric(
+              horizontal: 10,
+              vertical: 7,
+            ),
+            decoration: BoxDecoration(
+              color: selected ? _ink : Colors.transparent,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, size: 17, color: contentColor),
+                const SizedBox(width: 7),
+                Flexible(
+                  child: Text(
+                    label,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: contentColor,
+                      fontSize: 12,
+                      height: 1.15,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _WeekGridSummary extends StatelessWidget {
+  const _WeekGridSummary({
     required this.days,
     required this.events,
     required this.onEventTap,
@@ -458,6 +605,7 @@ class _WeekAgenda extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView.separated(
+      key: const Key('week-grid-layout'),
       padding: const EdgeInsetsDirectional.fromSTEB(18, 4, 18, 92),
       itemCount: days.length,
       separatorBuilder: (context, index) => const Divider(height: 1, color: _line),
@@ -664,8 +812,8 @@ class _AgendaEvent extends StatelessWidget {
   }
 }
 
-class _WeekGrid extends StatelessWidget {
-  const _WeekGrid({
+class _WeekHourlyLayout extends StatelessWidget {
+  const _WeekHourlyLayout({
     required this.days,
     required this.events,
     required this.onEventTap,
@@ -675,24 +823,26 @@ class _WeekGrid extends StatelessWidget {
   final List<CalendarEvent> events;
   final ValueChanged<CalendarEvent> onEventTap;
 
-  static const startHour = 7;
-  static const endHour = 22;
-  static const hourHeight = 64.0;
-
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
+        final compact = constraints.maxWidth < 760;
+        final visibleRange = _visibleHourRange(events);
+        final startHour = visibleRange.$1;
+        final endHour = visibleRange.$2;
+        final hourHeight = compact ? 48.0 : 64.0;
         final gutterWidth = _timeGutterWidth(context, startHour, endHour);
         final columnWidth = (constraints.maxWidth - gutterWidth) / 7;
         final gridHeight = (endHour - startHour) * hourHeight;
 
         return Column(
+          key: const Key('week-hourly-layout'),
           children: [
             ConstrainedBox(
-              constraints: const BoxConstraints(minHeight: 58),
+              constraints: BoxConstraints(minHeight: compact ? 50 : 58),
               child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
+                padding: EdgeInsets.symmetric(vertical: compact ? 5 : 8),
                 child: Row(
                   children: [
                     SizedBox(width: gutterWidth),
@@ -769,6 +919,7 @@ class _WeekGrid extends StatelessWidget {
                             gutterWidth: gutterWidth,
                             startHour: startHour,
                             hourHeight: hourHeight,
+                            compact: compact,
                             onTap: onEventTap,
                           ),
                       if (_weekContainsToday(days))
@@ -840,6 +991,7 @@ class _GridEvent extends StatelessWidget {
     required this.gutterWidth,
     required this.startHour,
     required this.hourHeight,
+    required this.compact,
     required this.onTap,
   });
 
@@ -849,60 +1001,74 @@ class _GridEvent extends StatelessWidget {
   final double gutterWidth;
   final int startHour;
   final double hourHeight;
+  final bool compact;
   final ValueChanged<CalendarEvent> onTap;
 
   @override
   Widget build(BuildContext context) {
     final visibleStart = math.max(event.startMinutes, startHour * 60);
+    final visibleEnd = math.min(event.endMinutes, 24 * 60);
     final top = (visibleStart - startHour * 60) / 60 * hourHeight;
-    final height = math.max(34.0, event.durationMinutes / 60 * hourHeight);
+    final height = math.max(
+      compact ? 28.0 : 34.0,
+      (visibleEnd - visibleStart) / 60 * hourHeight,
+    );
 
     return PositionedDirectional(
-      start: gutterWidth + dayIndex * columnWidth + 4,
+      start: gutterWidth + dayIndex * columnWidth + (compact ? 2 : 4),
       top: top + 2,
-      width: columnWidth - 8,
+      width: columnWidth - (compact ? 4 : 8),
       height: height - 4,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () => onTap(event),
-        child: Container(
-          padding: const EdgeInsetsDirectional.fromSTEB(8, 6, 6, 5),
-          decoration: BoxDecoration(
-            color: event.color.withValues(alpha: 0.22),
-            border: BorderDirectional(
-              start: BorderSide(color: event.color, width: 3),
+      child: Semantics(
+        button: true,
+        label: '${event.title}, ${_formatTime(context, event.startMinutes)}',
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => onTap(event),
+          child: Container(
+            padding: EdgeInsetsDirectional.fromSTEB(
+              compact ? 5 : 8,
+              compact ? 4 : 6,
+              compact ? 3 : 6,
+              compact ? 3 : 5,
             ),
-            borderRadius: BorderRadius.circular(7),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                event.title,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: _ink,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  height: 1.1,
-                ),
+            decoration: BoxDecoration(
+              color: event.color.withValues(alpha: 0.22),
+              border: BorderDirectional(
+                start: BorderSide(color: event.color, width: compact ? 2 : 3),
               ),
-              if (height >= 54) ...[
-                const SizedBox(height: 3),
+              borderRadius: BorderRadius.circular(compact ? 5 : 7),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
                 Text(
-                  _formatTime(context, event.startMinutes),
-                  maxLines: 1,
+                  event.title,
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  softWrap: false,
-                  style: const TextStyle(
-                    color: _mutedInk,
-                    fontSize: 10,
-                    height: 1.2,
+                  style: TextStyle(
+                    color: _ink,
+                    fontSize: compact ? 9 : 12,
+                    fontWeight: FontWeight.w600,
+                    height: 1.1,
                   ),
                 ),
+                if (!compact && height >= 54) ...[
+                  const SizedBox(height: 3),
+                  Text(
+                    _formatTime(context, event.startMinutes),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    softWrap: false,
+                    style: const TextStyle(
+                      color: _mutedInk,
+                      fontSize: 10,
+                      height: 1.2,
+                    ),
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),
@@ -1573,6 +1739,18 @@ bool _isSameDay(DateTime a, DateTime b) {
 bool _weekContainsToday(List<DateTime> days) {
   final today = DateTime.now();
   return days.any((day) => _isSameDay(day, today));
+}
+
+(int, int) _visibleHourRange(List<CalendarEvent> events) {
+  var startHour = 7;
+  var endHour = 22;
+  for (final event in events) {
+    startHour = math.min(startHour, event.startMinutes ~/ 60);
+    endHour = math.max(endHour, (event.endMinutes / 60).ceil());
+  }
+  final safeStart = math.max(0, math.min(startHour, 23));
+  final safeEnd = math.max(safeStart + 1, math.min(endHour, 24));
+  return (safeStart, safeEnd);
 }
 
 String _formatTime(BuildContext context, int minutes) {

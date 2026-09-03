@@ -21,6 +21,17 @@ void main() {
     );
   });
 
+  testWidgets('renders the mobile hourly week view', (tester) async {
+    await _pumpPreview(tester, const Size(430, 932));
+    await tester.tap(find.byKey(const Key('week-layout-hourly')));
+    await tester.pumpAndSettle();
+
+    await expectLater(
+      find.byKey(_previewKey),
+      matchesGoldenFile('goldens/mobile-week-hourly.png'),
+    );
+  });
+
   testWidgets('renders mobile event details', (tester) async {
     await _pumpPreview(tester, const Size(430, 932));
     await tester.tap(find.text('Plan the week'));
