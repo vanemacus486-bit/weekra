@@ -29,7 +29,10 @@ class WindowsUpdateService implements UpdateService {
     final request = await _httpClient.getUrl(manifestUri).timeout(
       const Duration(seconds: 12),
     );
-    request.headers.userAgent = 'Weekra/$_currentVersion';
+    request.headers.set(
+      HttpHeaders.userAgentHeader,
+      'Weekra/$_currentVersion',
+    );
     final response = await request.close().timeout(const Duration(seconds: 12));
     if (response.statusCode != HttpStatus.ok) {
       await response.drain<void>();
@@ -111,7 +114,10 @@ class WindowsUpdateService implements UpdateService {
     final request = await _httpClient.getUrl(uri).timeout(
       const Duration(seconds: 15),
     );
-    request.headers.userAgent = 'Weekra/$_currentVersion';
+    request.headers.set(
+      HttpHeaders.userAgentHeader,
+      'Weekra/$_currentVersion',
+    );
     final response = await request.close().timeout(const Duration(seconds: 15));
     if (response.statusCode != HttpStatus.ok) {
       await response.drain<void>();
