@@ -1315,7 +1315,7 @@ class _EventDetailsSheet extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     return SafeArea(
       top: false,
-      child: Padding(
+      child: SingleChildScrollView(
         padding: const EdgeInsetsDirectional.fromSTEB(24, 14, 24, 22),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -1486,6 +1486,7 @@ Future<_EventAction?> _showEventDetailsSheet(
 ) {
   return showModalBottomSheet<_EventAction>(
     context: context,
+    isScrollControlled: true,
     backgroundColor: const Color(0xFF1B1D22),
     showDragHandle: false,
     builder: (context) => _EventDetailsSheet(event: event),
