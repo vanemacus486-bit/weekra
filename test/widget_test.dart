@@ -10,6 +10,7 @@ void main() {
       WeekraApp(
         eventStore: _MemoryEventStore(),
         locale: const Locale('en'),
+        enableAutomaticUpdates: false,
       ),
     );
     await tester.pumpAndSettle();
@@ -22,7 +23,11 @@ void main() {
   testWidgets('creates and saves an event', (tester) async {
     final store = _MemoryEventStore();
     await tester.pumpWidget(
-      WeekraApp(eventStore: store, locale: const Locale('en')),
+      WeekraApp(
+        eventStore: store,
+        locale: const Locale('en'),
+        enableAutomaticUpdates: false,
+      ),
     );
     await tester.pumpAndSettle();
 
@@ -43,7 +48,11 @@ void main() {
   testWidgets('edits an existing event', (tester) async {
     final store = _MemoryEventStore([_event('Original title')]);
     await tester.pumpWidget(
-      WeekraApp(eventStore: store, locale: const Locale('en')),
+      WeekraApp(
+        eventStore: store,
+        locale: const Locale('en'),
+        enableAutomaticUpdates: false,
+      ),
     );
     await tester.pumpAndSettle();
 
@@ -69,7 +78,11 @@ void main() {
   testWidgets('deletes an existing event after confirmation', (tester) async {
     final store = _MemoryEventStore([_event('Remove me')]);
     await tester.pumpWidget(
-      WeekraApp(eventStore: store, locale: const Locale('en')),
+      WeekraApp(
+        eventStore: store,
+        locale: const Locale('en'),
+        enableAutomaticUpdates: false,
+      ),
     );
     await tester.pumpAndSettle();
 
@@ -95,6 +108,7 @@ void main() {
         eventStore: _MemoryEventStore(),
         locale: const Locale('zh'),
         textScaler: TextScaler.linear(1.6),
+        enableAutomaticUpdates: false,
       ),
     );
     await tester.pumpAndSettle();
@@ -124,6 +138,7 @@ void main() {
         eventStore: store,
         locale: const Locale('en', 'XA'),
         textScaler: TextScaler.linear(1.6),
+        enableAutomaticUpdates: false,
       ),
     );
     await tester.pumpAndSettle();
