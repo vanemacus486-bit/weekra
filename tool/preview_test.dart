@@ -54,6 +54,7 @@ Future<void> _pumpPreview(WidgetTester tester, Size size) async {
       child: WeekraApp(
         eventStore: _PreviewEventStore(_previewEvents()),
         fontFamily: 'WeekraPreview',
+        locale: const Locale('en'),
       ),
     ),
   );

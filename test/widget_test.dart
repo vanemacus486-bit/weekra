@@ -6,17 +6,24 @@ import 'package:weekra/features/calendar/domain/calendar_event.dart';
 
 void main() {
   testWidgets('shows the Weekra week view', (tester) async {
-    await tester.pumpWidget(WeekraApp(eventStore: _MemoryEventStore()));
+    await tester.pumpWidget(
+      WeekraApp(
+        eventStore: _MemoryEventStore(),
+        locale: const Locale('en'),
+      ),
+    );
     await tester.pumpAndSettle();
 
-    expect(find.text('WEEKRA  /  YOUR WEEK'), findsOneWidget);
+    expect(find.text('WEEKRA / YOUR WEEK'), findsOneWidget);
     expect(find.text('Today'), findsOneWidget);
     expect(find.byType(FloatingActionButton), findsOneWidget);
   });
 
   testWidgets('creates and saves an event', (tester) async {
     final store = _MemoryEventStore();
-    await tester.pumpWidget(WeekraApp(eventStore: store));
+    await tester.pumpWidget(
+      WeekraApp(eventStore: store, locale: const Locale('en')),
+    );
     await tester.pumpAndSettle();
 
     await tester.tap(find.byType(FloatingActionButton));
@@ -35,7 +42,9 @@ void main() {
 
   testWidgets('edits an existing event', (tester) async {
     final store = _MemoryEventStore([_event('Original title')]);
-    await tester.pumpWidget(WeekraApp(eventStore: store));
+    await tester.pumpWidget(
+      WeekraApp(eventStore: store, locale: const Locale('en')),
+    );
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Original title'));
@@ -59,7 +68,9 @@ void main() {
 
   testWidgets('deletes an existing event after confirmation', (tester) async {
     final store = _MemoryEventStore([_event('Remove me')]);
-    await tester.pumpWidget(WeekraApp(eventStore: store));
+    await tester.pumpWidget(
+      WeekraApp(eventStore: store, locale: const Locale('en')),
+    );
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Remove me'));
@@ -74,6 +85,70 @@ void main() {
     expect(store.savedEvents, isEmpty);
     expect(find.text('Remove me'), findsNothing);
   });
+
+  testWidgets('supports Simplified Chinese throughout the event flow', (
+    tester,
+  ) async {
+    _useViewport(tester, const Size(320, 568));
+    await tester.pumpWidget(
+      WeekraApp(
+        eventStore: _MemoryEventStore(),
+        locale: const Locale('zh'),
+        textScaler: TextScaler.linear(1.6),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('WEEKRA / 我的一周'), findsOneWidget);
+    expect(find.text('今天'), findsOneWidget);
+    expect(find.text('暂无安排'), findsWidgets);
+
+    await tester.tap(find.byType(FloatingActionButton));
+    await tester.pumpAndSettle();
+    expect(find.text('新建日程'), findsOneWidget);
+    expect(find.text('地点（可选）'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('pseudo-localization tolerates expanded text and large type', (
+    tester,
+  ) async {
+    _useViewport(tester, const Size(320, 568));
+    final store = _MemoryEventStore([
+      _event(
+        'A deliberately long calendar event title for layout verification',
+      ),
+    ]);
+    await tester.pumpWidget(
+      WeekraApp(
+        eventStore: store,
+        locale: const Locale('en', 'XA'),
+        textScaler: TextScaler.linear(1.6),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('⟦WEEKRA / YOUR EXTRA SPACIOUS WEEK⟧'),
+      findsOneWidget,
+    );
+    await tester.tap(
+      find.text(
+        'A deliberately long calendar event title for layout verification',
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('⟦Edit event details⟧'), findsOneWidget);
+    expect(find.text('⟦Delete this event⟧'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+}
+
+void _useViewport(WidgetTester tester, Size size) {
+  tester.view.devicePixelRatio = 1;
+  tester.view.physicalSize = size;
+  addTearDown(tester.view.resetDevicePixelRatio);
+  addTearDown(tester.view.resetPhysicalSize);
 }
 
 class _MemoryEventStore implements CalendarEventStore {

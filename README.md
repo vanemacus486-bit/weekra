@@ -39,8 +39,24 @@ The first UI slice is in place:
 - Working event form with date, time, location, and color
 - Offline JSON persistence in the app documents directory
 - Event detail, editing, and confirmed deletion flows
+- System-driven English and Simplified Chinese UI
+- Pseudo-localization plus small-screen and large-type layout tests
 
 Drag-to-create and drag-to-reschedule interactions are the next MVP slice.
+
+## Internationalization
+
+Weekra generates its localized resources from ARB files in `lib/l10n`.
+English is the source locale, Simplified Chinese is supported in production,
+and `en_XA` is an intentionally expanded pseudo-locale used by widget tests.
+
+```bash
+flutter gen-l10n
+flutter test
+```
+
+See [docs/I18N.md](docs/I18N.md) for the UI contract every new screen must
+follow.
 
 ## Design reference
 

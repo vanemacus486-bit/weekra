@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - 'lib/**'
+      - 'l10n.yaml'
+      - 'pubspec.yaml'
       - 'tool/preview_test.dart'
       - '.github/workflows/flutter-preview.yml'
 
@@ -28,6 +30,9 @@ jobs:
 
       - name: Install dependencies
         run: flutter pub get
+
+      - name: Generate localizations
+        run: flutter gen-l10n
 
       - name: Render previews
         run: flutter test --update-goldens tool/preview_test.dart
