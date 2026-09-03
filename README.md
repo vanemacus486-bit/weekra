@@ -27,8 +27,20 @@ flutter pub get
 flutter run
 ```
 
+## Current progress
+
+The first UI slice is in place:
+
+- Timepage-inspired continuous week agenda on phones
+- Seven-column hourly grid on wider screens
+- Current-day and current-time emphasis
+- Previous/next week navigation, including horizontal swipe
+- Responsive event blocks backed by a small domain model
+
+Event creation currently opens a preview sheet. Editing and local persistence
+are the next MVP slice.
+
 ## Design reference
 
 Timepage is used as a product and interaction reference. Weekra will use its
 own brand, visual assets, copy, and implementation.
-
