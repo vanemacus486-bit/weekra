@@ -426,13 +426,18 @@ class _AgendaDay extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  _weekdayNames[day.weekday - 1].toUpperCase(),
-                  style: TextStyle(
-                    color: isToday ? _accent : _mutedInk,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 1.2,
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    _weekdayNames[day.weekday - 1].toUpperCase(),
+                    maxLines: 1,
+                    style: TextStyle(
+                      color: isToday ? _accent : _mutedInk,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1.2,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 3),

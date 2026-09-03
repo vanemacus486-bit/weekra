@@ -1,4 +1,5 @@
 import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -9,7 +10,7 @@ import 'package:weekra/features/calendar/domain/calendar_event.dart';
 const _previewKey = Key('weekra-preview');
 
 void main() {
-  setUpAll(_loadPreviewFont);
+  setUpAll(_loadPreviewFonts);
 
   testWidgets('renders the mobile week view', (tester) async {
     await _pumpPreview(tester, const Size(430, 932));
@@ -59,16 +60,33 @@ Future<void> _pumpPreview(WidgetTester tester, Size size) async {
   await tester.pumpAndSettle();
 }
 
-Future<void> _loadPreviewFont() async {
-  final bytes = await File(
-    '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
-  ).readAsBytes();
+Future<void> _loadPreviewFonts() async {
+  final flutterRoot = Platform.environment['FLUTTER_ROOT'];
+  if (flutterRoot == null) {
+    throw StateError('FLUTTER_ROOT is required to render previews.');
+  }
+
+  await Future.wait([
+    _loadFont(
+      'WeekraPreview',
+      '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+    ),
+    _loadFont(
+      'MaterialIcons',
+      '$flutterRoot/bin/cache/artifacts/material_fonts/'
+          'MaterialIcons-Regular.otf',
+    ),
+  ]);
+}
+
+Future<void> _loadFont(String family, String path) async {
+  final bytes = await File(path).readAsBytes();
   final byteData = ByteData.view(
     bytes.buffer,
     bytes.offsetInBytes,
     bytes.lengthInBytes,
   );
-  final loader = FontLoader('WeekraPreview')
+  final loader = FontLoader(family)
     ..addFont(Future<ByteData>.value(byteData));
   await loader.load();
 }
