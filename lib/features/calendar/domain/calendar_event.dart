@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 class CalendarEvent {
-  const CalendarEvent({
+  CalendarEvent({
     required this.id,
     required this.title,
     required this.start,
@@ -51,4 +51,3 @@ class CalendarEvent {
     );
   }
 }
-
