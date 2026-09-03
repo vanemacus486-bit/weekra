@@ -6,9 +6,11 @@ class WeekraApp extends StatelessWidget {
   const WeekraApp({
     super.key,
     this.eventStore = const JsonCalendarEventStore(),
+    this.fontFamily,
   });
 
   final CalendarEventStore eventStore;
+  final String? fontFamily;
 
   @override
   Widget build(BuildContext context) {
@@ -19,6 +21,7 @@ class WeekraApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.dark,
+        fontFamily: fontFamily,
         colorScheme: ColorScheme.fromSeed(
           seedColor: accent,
           brightness: Brightness.dark,
