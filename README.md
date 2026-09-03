@@ -38,8 +38,9 @@ The first UI slice is in place:
 - Responsive event blocks backed by a small domain model
 - Working event form with date, time, location, and color
 - Offline JSON persistence in the app documents directory
+- Event detail, editing, and confirmed deletion flows
 
-Editing and deleting existing events are the next MVP slice.
+Drag-to-create and drag-to-reschedule interactions are the next MVP slice.
 
 ## Design reference
 

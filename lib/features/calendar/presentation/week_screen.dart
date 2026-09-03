@@ -60,14 +60,60 @@ class _WeekScreenState extends State<WeekScreen> {
   }
 
   Future<void> _createEvent() async {
-    final event = await _showCreateEventSheet(context, _weekStart);
+    final event = await _showEventEditorSheet(context, _weekStart);
     if (event == null || !mounted) {
       return;
     }
 
-    final previousEvents = _events;
     final updatedEvents = [..._events, event]
       ..sort((a, b) => a.start.compareTo(b.start));
+    await _persistMutation(
+      updatedEvents,
+      failureMessage: 'The event could not be saved. Please try again.',
+    );
+  }
+
+  Future<void> _openEvent(CalendarEvent event) async {
+    final action = await _showEventDetailsSheet(context, event);
+    if (action == null || !mounted) {
+      return;
+    }
+
+    if (action == _EventAction.edit) {
+      final updatedEvent = await _showEventEditorSheet(
+        context,
+        _weekStart,
+        existingEvent: event,
+      );
+      if (updatedEvent == null || !mounted) {
+        return;
+      }
+      final updatedEvents = _events
+          .map((item) => item.id == event.id ? updatedEvent : item)
+          .toList()
+        ..sort((a, b) => a.start.compareTo(b.start));
+      await _persistMutation(
+        updatedEvents,
+        failureMessage: 'The changes could not be saved. Please try again.',
+      );
+      return;
+    }
+
+    final shouldDelete = await _confirmDelete(context, event);
+    if (!shouldDelete || !mounted) {
+      return;
+    }
+    await _persistMutation(
+      _events.where((item) => item.id != event.id).toList(),
+      failureMessage: 'The event could not be deleted. Please try again.',
+    );
+  }
+
+  Future<void> _persistMutation(
+    List<CalendarEvent> updatedEvents, {
+    required String failureMessage,
+  }) async {
+    final previousEvents = _events;
     setState(() {
       _events = updatedEvents;
       _storageError = null;
@@ -81,7 +127,7 @@ class _WeekScreenState extends State<WeekScreen> {
       }
       setState(() {
         _events = previousEvents;
-        _storageError = 'The event could not be saved. Please try again.';
+        _storageError = failureMessage;
       });
     }
   }
@@ -151,9 +197,17 @@ class _WeekScreenState extends State<WeekScreen> {
                       key: ValueKey(_weekStart),
                       builder: (context, constraints) {
                         if (constraints.maxWidth >= 760) {
-                          return _WeekGrid(days: days, events: events);
+                          return _WeekGrid(
+                            days: days,
+                            events: events,
+                            onEventTap: _openEvent,
+                          );
                         }
-                        return _WeekAgenda(days: days, events: events);
+                        return _WeekAgenda(
+                          days: days,
+                          events: events,
+                          onEventTap: _openEvent,
+                        );
                       },
                     ),
                   ),
@@ -313,10 +367,15 @@ class _WeekToolbar extends StatelessWidget {
 }
 
 class _WeekAgenda extends StatelessWidget {
-  const _WeekAgenda({required this.days, required this.events});
+  const _WeekAgenda({
+    required this.days,
+    required this.events,
+    required this.onEventTap,
+  });
 
   final List<DateTime> days;
   final List<CalendarEvent> events;
+  final ValueChanged<CalendarEvent> onEventTap;
 
   @override
   Widget build(BuildContext context) {
@@ -334,6 +393,7 @@ class _WeekAgenda extends StatelessWidget {
           day: day,
           events: dayEvents,
           isToday: _isSameDay(day, DateTime.now()),
+          onEventTap: onEventTap,
         );
       },
     );
@@ -345,11 +405,13 @@ class _AgendaDay extends StatelessWidget {
     required this.day,
     required this.events,
     required this.isToday,
+    required this.onEventTap,
   });
 
   final DateTime day;
   final List<CalendarEvent> events;
   final bool isToday;
+  final ValueChanged<CalendarEvent> onEventTap;
 
   @override
   Widget build(BuildContext context) {
@@ -406,7 +468,10 @@ class _AgendaDay extends StatelessWidget {
                 : Column(
                     children: [
                       for (var index = 0; index < events.length; index++) ...[
-                        _AgendaEvent(event: events[index]),
+                        _AgendaEvent(
+                          event: events[index],
+                          onTap: onEventTap,
+                        ),
                         if (index != events.length - 1) const SizedBox(height: 12),
                       ],
                     ],
@@ -419,15 +484,19 @@ class _AgendaDay extends StatelessWidget {
 }
 
 class _AgendaEvent extends StatelessWidget {
-  const _AgendaEvent({required this.event});
+  const _AgendaEvent({required this.event, required this.onTap});
 
   final CalendarEvent event;
+  final ValueChanged<CalendarEvent> onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => onTap(event),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
         Container(
           width: 3,
           height: event.location == null ? 42 : 52,
@@ -475,16 +544,22 @@ class _AgendaEvent extends StatelessWidget {
             ],
           ),
         ),
-      ],
+        ],
+      ),
     );
   }
 }
 
 class _WeekGrid extends StatelessWidget {
-  const _WeekGrid({required this.days, required this.events});
+  const _WeekGrid({
+    required this.days,
+    required this.events,
+    required this.onEventTap,
+  });
 
   final List<DateTime> days;
   final List<CalendarEvent> events;
+  final ValueChanged<CalendarEvent> onEventTap;
 
   static const startHour = 7;
   static const endHour = 22;
@@ -567,6 +642,7 @@ class _WeekGrid extends StatelessWidget {
                             gutterWidth: gutterWidth,
                             startHour: startHour,
                             hourHeight: hourHeight,
+                            onTap: onEventTap,
                           ),
                       if (_weekContainsToday(days))
                         _CurrentTimeLine(
@@ -630,6 +706,7 @@ class _GridEvent extends StatelessWidget {
     required this.gutterWidth,
     required this.startHour,
     required this.hourHeight,
+    required this.onTap,
   });
 
   final CalendarEvent event;
@@ -638,6 +715,7 @@ class _GridEvent extends StatelessWidget {
   final double gutterWidth;
   final int startHour;
   final double hourHeight;
+  final ValueChanged<CalendarEvent> onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -650,35 +728,39 @@ class _GridEvent extends StatelessWidget {
       top: top + 2,
       width: columnWidth - 8,
       height: height - 4,
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(8, 6, 6, 5),
-        decoration: BoxDecoration(
-          color: event.color.withValues(alpha: 0.22),
-          border: Border(left: BorderSide(color: event.color, width: 3)),
-          borderRadius: BorderRadius.circular(7),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              event.title,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: _ink,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                height: 1.1,
-              ),
-            ),
-            if (height >= 54) ...[
-              const SizedBox(height: 3),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => onTap(event),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(8, 6, 6, 5),
+          decoration: BoxDecoration(
+            color: event.color.withValues(alpha: 0.22),
+            border: Border(left: BorderSide(color: event.color, width: 3)),
+            borderRadius: BorderRadius.circular(7),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
               Text(
-                _clock(event.startMinutes),
-                style: const TextStyle(color: _mutedInk, fontSize: 10),
+                event.title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: _ink,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  height: 1.1,
+                ),
               ),
+              if (height >= 54) ...[
+                const SizedBox(height: 3),
+                Text(
+                  _clock(event.startMinutes),
+                  style: const TextStyle(color: _mutedInk, fontSize: 10),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
@@ -727,16 +809,20 @@ class _CurrentTimeLine extends StatelessWidget {
   }
 }
 
-class _CreateEventSheet extends StatefulWidget {
-  const _CreateEventSheet({required this.weekStart});
+class _EventEditorSheet extends StatefulWidget {
+  const _EventEditorSheet({
+    required this.weekStart,
+    this.existingEvent,
+  });
 
   final DateTime weekStart;
+  final CalendarEvent? existingEvent;
 
   @override
-  State<_CreateEventSheet> createState() => _CreateEventSheetState();
+  State<_EventEditorSheet> createState() => _EventEditorSheetState();
 }
 
-class _CreateEventSheetState extends State<_CreateEventSheet> {
+class _EventEditorSheetState extends State<_EventEditorSheet> {
   static const _eventColors = [
     Color(0xFFFF7B6F),
     Color(0xFF63C8C2),
@@ -757,6 +843,20 @@ class _CreateEventSheetState extends State<_CreateEventSheet> {
   @override
   void initState() {
     super.initState();
+    final existingEvent = widget.existingEvent;
+    if (existingEvent != null) {
+      _titleController.text = existingEvent.title;
+      _locationController.text = existingEvent.location ?? '';
+      _selectedDate = DateTime(
+        existingEvent.start.year,
+        existingEvent.start.month,
+        existingEvent.start.day,
+      );
+      _startTime = TimeOfDay.fromDateTime(existingEvent.start);
+      _endTime = TimeOfDay.fromDateTime(existingEvent.end);
+      _selectedColor = existingEvent.color;
+      return;
+    }
     final today = DateTime.now();
     final weekEnd = widget.weekStart.add(const Duration(days: 7));
     final isInWeek = !today.isBefore(widget.weekStart) && today.isBefore(weekEnd);
@@ -806,7 +906,8 @@ class _CreateEventSheetState extends State<_CreateEventSheet> {
     final location = _locationController.text.trim();
     Navigator.of(context).pop(
       CalendarEvent(
-        id: DateTime.now().microsecondsSinceEpoch.toString(),
+        id: widget.existingEvent?.id ??
+            DateTime.now().microsecondsSinceEpoch.toString(),
         title: title,
         start: start,
         end: end,
@@ -846,9 +947,12 @@ class _CreateEventSheetState extends State<_CreateEventSheet> {
                 ),
               ),
               const SizedBox(height: 22),
-              const Text(
-                'New event',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.w600),
+              Text(
+                widget.existingEvent == null ? 'New event' : 'Edit event',
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
               const SizedBox(height: 18),
               TextField(
@@ -959,7 +1063,9 @@ class _CreateEventSheetState extends State<_CreateEventSheet> {
                 child: FilledButton(
                   key: const Key('save-event'),
                   onPressed: _save,
-                  child: const Text('Save event'),
+                  child: Text(
+                    widget.existingEvent == null ? 'Save event' : 'Save changes',
+                  ),
                 ),
               ),
             ],
@@ -970,16 +1076,181 @@ class _CreateEventSheetState extends State<_CreateEventSheet> {
   }
 }
 
-Future<CalendarEvent?> _showCreateEventSheet(
+enum _EventAction { edit, delete }
+
+class _EventDetailsSheet extends StatelessWidget {
+  const _EventDetailsSheet({required this.event});
+
+  final CalendarEvent event;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 14, 24, 22),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: _mutedInk,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 22),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 5,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    color: event.color,
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Text(
+                    event.title,
+                    style: const TextStyle(
+                      fontSize: 25,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  tooltip: 'Close',
+                  icon: const Icon(Icons.close_rounded),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            _EventDetailRow(
+              icon: Icons.calendar_today_outlined,
+              text: _longDate(event.start),
+            ),
+            const SizedBox(height: 12),
+            _EventDetailRow(
+              icon: Icons.schedule_rounded,
+              text: '${_clock(event.startMinutes)} – ${_clock(event.endMinutes)}',
+            ),
+            if (event.location != null) ...[
+              const SizedBox(height: 12),
+              _EventDetailRow(
+                icon: Icons.location_on_outlined,
+                text: event.location!,
+              ),
+            ],
+            const SizedBox(height: 26),
+            Row(
+              children: [
+                Expanded(
+                  child: FilledButton.icon(
+                    key: const Key('edit-event'),
+                    onPressed: () =>
+                        Navigator.of(context).pop(_EventAction.edit),
+                    icon: const Icon(Icons.edit_outlined, size: 18),
+                    label: const Text('Edit'),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    key: const Key('delete-event'),
+                    onPressed: () =>
+                        Navigator.of(context).pop(_EventAction.delete),
+                    icon: const Icon(Icons.delete_outline_rounded, size: 18),
+                    label: const Text('Delete'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _EventDetailRow extends StatelessWidget {
+  const _EventDetailRow({required this.icon, required this.text});
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: _mutedInk),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            text,
+            style: const TextStyle(color: _ink, fontSize: 14),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+Future<_EventAction?> _showEventDetailsSheet(
   BuildContext context,
-  DateTime weekStart,
+  CalendarEvent event,
 ) {
+  return showModalBottomSheet<_EventAction>(
+    context: context,
+    backgroundColor: const Color(0xFF1B1D22),
+    showDragHandle: false,
+    builder: (context) => _EventDetailsSheet(event: event),
+  );
+}
+
+Future<bool> _confirmDelete(BuildContext context, CalendarEvent event) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('Delete event?'),
+      content: Text('“${event.title}” will be removed from this device.'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          key: const Key('confirm-delete-event'),
+          onPressed: () => Navigator.of(context).pop(true),
+          child: const Text('Delete'),
+        ),
+      ],
+    ),
+  );
+  return confirmed ?? false;
+}
+
+Future<CalendarEvent?> _showEventEditorSheet(
+  BuildContext context,
+  DateTime weekStart, {
+  CalendarEvent? existingEvent,
+}) {
   return showModalBottomSheet<CalendarEvent>(
     context: context,
     isScrollControlled: true,
     backgroundColor: const Color(0xFF1B1D22),
     showDragHandle: false,
-    builder: (context) => _CreateEventSheet(weekStart: weekStart),
+    builder: (context) => _EventEditorSheet(
+      weekStart: weekStart,
+      existingEvent: existingEvent,
+    ),
   );
 }
 
@@ -1012,6 +1283,13 @@ String _clock(int minutes) {
   final hour = (minutes ~/ 60).toString().padLeft(2, '0');
   final minute = (minutes % 60).toString().padLeft(2, '0');
   return '$hour:$minute';
+}
+
+String _longDate(DateTime date) {
+  final weekday = _weekdayNames[date.weekday - 1];
+  final month = _monthNames[date.month - 1].toLowerCase();
+  final displayMonth = '${month[0].toUpperCase()}${month.substring(1)}';
+  return '$weekday, $displayMonth ${date.day}';
 }
 
 String _weekLabel(DateTime weekStart) {
