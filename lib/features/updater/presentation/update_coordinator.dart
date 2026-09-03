@@ -91,8 +91,7 @@ class _UpdateCoordinatorState extends State<UpdateCoordinator> {
 
   Future<void> _install(AppUpdate update) async {
     final l10n = AppLocalizations.of(context);
-    final progress = ValueNotifier<double?>(0.0);
-    var installing = false;
+    final progress = ValueNotifier<(double?, bool)>((0.0, false));
     unawaited(
       showDialog<void>(
         context: context,
@@ -100,21 +99,21 @@ class _UpdateCoordinatorState extends State<UpdateCoordinator> {
         builder: (context) => PopScope(
           canPop: false,
           child: AlertDialog(
-            content: ValueListenableBuilder<double?>(
+            content: ValueListenableBuilder<(double?, bool)>(
               valueListenable: progress,
               builder: (context, value, child) => Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
-                    installing
+                    value.$2
                         ? l10n.updateInstalling
                         : l10n.updateDownloading,
                     softWrap: true,
                     overflow: TextOverflow.visible,
                   ),
                   const SizedBox(height: 20),
-                  LinearProgressIndicator(value: installing ? null : value),
+                  LinearProgressIndicator(value: value.$2 ? null : value.$1),
                 ],
               ),
             ),
@@ -127,10 +126,10 @@ class _UpdateCoordinatorState extends State<UpdateCoordinator> {
       await widget.updateService!.downloadAndInstall(
         update,
         onProgress: (value) {
-          progress.value = value;
           if (value != null && value >= 1) {
-            installing = true;
-            progress.notifyListeners();
+            progress.value = (null, true);
+          } else {
+            progress.value = (value, false);
           }
         },
       );
