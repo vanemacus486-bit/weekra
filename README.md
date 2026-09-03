@@ -27,11 +27,32 @@ flutter pub get
 flutter run
 ```
 
-## Windows package
+## Install on Windows
 
-The `Windows Package` workflow builds a ready-to-run x64 archive. Download the
-`weekra-windows-x64` artifact, extract the complete folder, and open
-`weekra.exe`. Keep the DLL and `data` files beside the executable.
+Download `weekra-setup-x64.exe` from the latest GitHub Release and run it.
+The installer places the production app in the current user's local Programs
+folder, adds Start menu integration, and optionally creates a desktop shortcut.
+Flutter is not required on the user's computer.
+
+Weekra checks for updates shortly after launch. When a newer version is
+available, it downloads the portable release, verifies its SHA-256 digest,
+installs it, and restarts automatically after the user confirms. Calendar data
+stays in the user's documents directory during updates.
+
+An unsigned portable build, `weekra-windows-x64.zip`, is also attached to each
+release. Extract the complete folder before opening `weekra.exe`.
+
+## Publish a Windows update
+
+1. Increase `version` in `pubspec.yaml`.
+2. Push the change to `main`, or run the `Windows Release` workflow manually.
+3. Wait for the workflow to test, build, package, and publish the GitHub Release.
+
+The release contains the installer, portable app, and `update.json` manifest.
+Because the app reads the latest release automatically, no update URL needs to
+be edited for future versions. The repository and its Releases must be public
+unless a separate public update host is configured at build time with
+`WEEKRA_UPDATE_MANIFEST_URL`.
 
 ## Current progress
 
