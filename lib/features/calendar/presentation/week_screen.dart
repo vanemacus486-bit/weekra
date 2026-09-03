@@ -1,5 +1,4 @@
 import 'dart:math' as math;
-import 'dart:ui' show FontFeature;
 
 import 'package:flutter/material.dart';
 import 'package:weekra/features/calendar/domain/calendar_event.dart';
@@ -563,12 +562,7 @@ class _GridEvent extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.fromLTRB(8, 6, 6, 5),
         decoration: BoxDecoration(
-          color: Color.fromRGBO(
-            event.color.red,
-            event.color.green,
-            event.color.blue,
-            0.22,
-          ),
+          color: event.color.withValues(alpha: 0.22),
           border: Border(left: BorderSide(color: event.color, width: 3)),
           borderRadius: BorderRadius.circular(7),
         ),
