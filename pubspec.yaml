@@ -9,6 +9,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  path_provider: ^2.1.6
 
 dev_dependencies:
   flutter_test:
@@ -17,4 +18,3 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-

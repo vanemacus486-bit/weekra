@@ -1,8 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:weekra/features/calendar/data/calendar_event_store.dart';
 import 'package:weekra/features/calendar/presentation/week_screen.dart';
 
 class WeekraApp extends StatelessWidget {
-  const WeekraApp({super.key});
+  const WeekraApp({
+    super.key,
+    this.eventStore = const JsonCalendarEventStore(),
+  });
+
+  final CalendarEventStore eventStore;
 
   @override
   Widget build(BuildContext context) {
@@ -21,8 +27,7 @@ class WeekraApp extends StatelessWidget {
         scaffoldBackgroundColor: Colors.transparent,
         useMaterial3: true,
       ),
-      home: const WeekScreen(),
+      home: WeekScreen(eventStore: eventStore),
     );
   }
 }
-

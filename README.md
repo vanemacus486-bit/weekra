@@ -36,9 +36,10 @@ The first UI slice is in place:
 - Current-day and current-time emphasis
 - Previous/next week navigation, including horizontal swipe
 - Responsive event blocks backed by a small domain model
+- Working event form with date, time, location, and color
+- Offline JSON persistence in the app documents directory
 
-Event creation currently opens a preview sheet. Editing and local persistence
-are the next MVP slice.
+Editing and deleting existing events are the next MVP slice.
 
 ## Design reference
 
