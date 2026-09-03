@@ -20,6 +20,7 @@ class WeekraApp extends StatelessWidget {
     this.locale,
     this.textScaler,
     this.updateService,
+    this.enableAutomaticUpdates = true,
   });
 
   final CalendarEventStore eventStore;
@@ -27,6 +28,7 @@ class WeekraApp extends StatelessWidget {
   final Locale? locale;
   final TextScaler? textScaler;
   final UpdateService? updateService;
+  final bool enableAutomaticUpdates;
 
   @override
   Widget build(BuildContext context) {
@@ -59,7 +61,9 @@ class WeekraApp extends StatelessWidget {
         useMaterial3: true,
       ),
       home: UpdateCoordinator(
-        updateService: updateService ?? _defaultUpdateService(),
+        updateService: enableAutomaticUpdates
+            ? updateService ?? _defaultUpdateService()
+            : null,
         child: WeekScreen(eventStore: eventStore),
       ),
     );
