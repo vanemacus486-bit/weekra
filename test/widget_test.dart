@@ -75,6 +75,107 @@ void main() {
     expect(find.text('Study'), findsOneWidget);
   });
 
+  testWidgets('creates an event by selecting and stretching a time block', (
+    tester,
+  ) async {
+    _useViewport(tester, const Size(900, 1000));
+    final store = _MemoryEventStore();
+    await tester.pumpWidget(
+      WeekraApp(
+        eventStore: store,
+        locale: const Locale('en'),
+        enableAutomaticUpdates: false,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final grid = find.byKey(const Key('week-hourly-grid'));
+    final gridRect = tester.getRect(grid);
+    await tester.tapAt(
+      Offset(gridRect.left + gridRect.width * 0.2, gridRect.top + 128),
+    );
+    await tester.pump();
+
+    expect(find.byKey(const Key('draft-event')), findsOneWidget);
+    await tester.drag(
+      find.byKey(const Key('draft-resize-end')),
+      const Offset(0, 32),
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('draft-event')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('New event'), findsOneWidget);
+    await tester.enterText(find.byKey(const Key('event-title')), 'Dragged event');
+    await tester.ensureVisible(find.byKey(const Key('save-event')));
+    await tester.tap(find.byKey(const Key('save-event')));
+    await tester.pumpAndSettle();
+
+    expect(store.savedEvents, hasLength(1));
+    expect(store.savedEvents.single.title, 'Dragged event');
+    expect(store.savedEvents.single.start.minute % 15, 0);
+    expect(store.savedEvents.single.durationMinutes, 90);
+  });
+
+  testWidgets('presses and drags an event to another day and time', (
+    tester,
+  ) async {
+    _useViewport(tester, const Size(900, 1000));
+    final original = _eventAtStartOfWeek('Move me');
+    final store = _MemoryEventStore([original]);
+    await tester.pumpWidget(
+      WeekraApp(
+        eventStore: store,
+        locale: const Locale('en'),
+        enableAutomaticUpdates: false,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final event = find.byKey(const Key('hourly-event-Move me'));
+    final gridWidth = tester.getSize(
+      find.byKey(const Key('week-hourly-grid')),
+    ).width;
+    final gesture = await tester.startGesture(tester.getCenter(event));
+    await tester.pump(const Duration(milliseconds: 600));
+    await gesture.moveBy(Offset(gridWidth / 7, 32));
+    await tester.pump();
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    final moved = store.savedEvents.single;
+    expect(moved.start.day, original.start.add(const Duration(days: 1)).day);
+    expect(moved.start.hour, 9);
+    expect(moved.start.minute, 30);
+    expect(moved.durationMinutes, original.durationMinutes);
+  });
+
+  testWidgets('stretches a selected event from its end handle', (
+    tester,
+  ) async {
+    _useViewport(tester, const Size(900, 1000));
+    final original = _eventAtStartOfWeek('Resize me');
+    final store = _MemoryEventStore([original]);
+    await tester.pumpWidget(
+      WeekraApp(
+        eventStore: store,
+        locale: const Locale('en'),
+        enableAutomaticUpdates: false,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('hourly-event-Resize me')));
+    await tester.pump();
+    final endHandle = find.byKey(const Key('event-resize-end-Resize me'));
+    expect(endHandle, findsOneWidget);
+    await tester.drag(endHandle, const Offset(0, 32));
+    await tester.pumpAndSettle();
+
+    expect(store.savedEvents.single.start, original.start);
+    expect(store.savedEvents.single.end, original.end.add(const Duration(minutes: 30)));
+  });
+
   testWidgets('edits an existing event', (tester) async {
     final store = _MemoryEventStore([_event('Original title')]);
     await tester.pumpWidget(
@@ -86,6 +187,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    await tester.tap(find.text('Original title'));
+    await tester.pump();
     await tester.tap(find.text('Original title'));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('edit-event')));
@@ -116,6 +219,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    await tester.tap(find.text('Remove me'));
+    await tester.pump();
     await tester.tap(find.text('Remove me'));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('delete-event')));
