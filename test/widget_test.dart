@@ -115,7 +115,7 @@ void main() {
   ) async {
     _useViewport(tester, const Size(320, 568));
     final store = _MemoryEventStore([
-      _event(
+      _eventAtStartOfWeek(
         'A deliberately long calendar event title for layout verification',
       ),
     ]);
@@ -174,6 +174,19 @@ CalendarEvent _event(String title) {
     title: title,
     start: start,
     end: start.add(const Duration(hours: 1)),
+    color: const Color(0xFFFF7B6F),
+  );
+}
+
+CalendarEvent _eventAtStartOfWeek(String title) {
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  final start = today.subtract(Duration(days: now.weekday - DateTime.monday));
+  return CalendarEvent(
+    id: title,
+    title: title,
+    start: start.add(const Duration(hours: 9)),
+    end: start.add(const Duration(hours: 10)),
     color: const Color(0xFFFF7B6F),
   );
 }
