@@ -1,4 +1,4 @@
-name: Windows Package
+name: Windows Release
 
 on:
   workflow_dispatch:
@@ -8,20 +8,30 @@ on:
       - 'lib/**'
       - 'pubspec.yaml'
       - 'l10n.yaml'
+      - 'installer/**'
       - 'windows/**'
       - '.github/workflows/windows-package.yml'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  build:
+  build-and-publish:
     runs-on: windows-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v5
+
+      - name: Read application version
+        id: version
+        shell: pwsh
+        run: |
+          $line = Select-String -Path 'pubspec.yaml' -Pattern '^version:\s*([^+\s]+)'
+          if (-not $line) { throw 'Version is missing from pubspec.yaml.' }
+          $version = $line.Matches[0].Groups[1].Value
+          "version=$version" >> $env:GITHUB_OUTPUT
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
@@ -38,22 +48,80 @@ jobs:
       - name: Generate localizations
         run: flutter gen-l10n
 
-      - name: Build Windows release
-        run: flutter build windows --release
+      - name: Run tests
+        run: flutter test
 
-      - name: Package application
+      - name: Build Windows release
         shell: pwsh
         run: |
+          flutter build windows --release `
+            --dart-define=WEEKRA_VERSION=${{ steps.version.outputs.version }}
+
+      - name: Package portable application
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path 'dist' -Force | Out-Null
           $release = 'build/windows/x64/runner/Release'
           Compress-Archive `
             -Path "$release/*" `
-            -DestinationPath 'weekra-windows-x64.zip' `
+            -DestinationPath 'dist/weekra-windows-x64.zip' `
             -Force
 
-      - name: Upload Windows package
+      - name: Build installer
+        shell: pwsh
+        run: |
+          & 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe' `
+            "/DMyAppVersion=${{ steps.version.outputs.version }}" `
+            'installer/weekra.iss'
+
+      - name: Create update manifest
+        shell: pwsh
+        run: |
+          $version = '${{ steps.version.outputs.version }}'
+          $archive = 'dist/weekra-windows-x64.zip'
+          $sha256 = (Get-FileHash -Algorithm SHA256 $archive).Hash.ToLowerInvariant()
+          $manifest = [ordered]@{
+            version = $version
+            windows = [ordered]@{
+              url = "https://github.com/${{ github.repository }}/releases/download/v$version/weekra-windows-x64.zip"
+              sha256 = $sha256
+            }
+          }
+          $manifest | ConvertTo-Json -Depth 3 | Set-Content `
+            -Path 'dist/update.json' `
+            -Encoding utf8NoBOM
+
+      - name: Upload workflow artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: weekra-windows-x64
-          path: weekra-windows-x64.zip
+          name: weekra-windows-${{ steps.version.outputs.version }}
+          path: |
+            dist/weekra-setup-x64.exe
+            dist/weekra-windows-x64.zip
+            dist/update.json
           if-no-files-found: error
           retention-days: 14
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        shell: pwsh
+        run: |
+          $tag = "v$env:VERSION"
+          if (gh release view $tag --repo '${{ github.repository }}' 2>$null) {
+            gh release upload $tag `
+              'dist/weekra-setup-x64.exe' `
+              'dist/weekra-windows-x64.zip' `
+              'dist/update.json' `
+              --clobber `
+              --repo '${{ github.repository }}'
+          } else {
+            gh release create $tag `
+              'dist/weekra-setup-x64.exe' `
+              'dist/weekra-windows-x64.zip' `
+              'dist/update.json' `
+              --title "Weekra $env:VERSION" `
+              --generate-notes `
+              --repo '${{ github.repository }}'
+          }
