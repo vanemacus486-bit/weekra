@@ -1,10 +1,16 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:weekra/features/calendar/data/calendar_event_store.dart';
 import 'package:weekra/features/calendar/presentation/week_screen.dart';
+import 'package:weekra/features/updater/data/windows_update_service.dart';
+import 'package:weekra/features/updater/domain/update_service.dart';
+import 'package:weekra/features/updater/presentation/update_coordinator.dart';
 import 'package:weekra/l10n/app_localizations.dart';
 
 const _localeOverride = String.fromEnvironment('WEEKRA_LOCALE');
+const _updatesDisabled = bool.fromEnvironment('WEEKRA_DISABLE_UPDATES');
 
 class WeekraApp extends StatelessWidget {
   const WeekraApp({
@@ -13,12 +19,14 @@ class WeekraApp extends StatelessWidget {
     this.fontFamily,
     this.locale,
     this.textScaler,
+    this.updateService,
   });
 
   final CalendarEventStore eventStore;
   final String? fontFamily;
   final Locale? locale;
   final TextScaler? textScaler;
+  final UpdateService? updateService;
 
   @override
   Widget build(BuildContext context) {
@@ -50,9 +58,19 @@ class WeekraApp extends StatelessWidget {
         scaffoldBackgroundColor: Colors.transparent,
         useMaterial3: true,
       ),
-      home: WeekScreen(eventStore: eventStore),
+      home: UpdateCoordinator(
+        updateService: updateService ?? _defaultUpdateService(),
+        child: WeekScreen(eventStore: eventStore),
+      ),
     );
   }
+}
+
+UpdateService? _defaultUpdateService() {
+  if (_updatesDisabled || !Platform.isWindows) {
+    return null;
+  }
+  return WindowsUpdateService();
 }
 
 Locale? _localeFromEnvironment() {

@@ -1,7 +1,7 @@
 name: weekra
 description: A calm, week-first calendar built with Flutter.
 publish_to: none
-version: 0.1.0+1
+version: 0.2.0+2
 
 environment:
   sdk: '>=3.8.0 <4.0.0'
@@ -12,6 +12,7 @@ dependencies:
   flutter_localizations:
     sdk: flutter
   intl: any
+  crypto: ^3.0.6
   path_provider: ^2.1.6
 
 dev_dependencies:
