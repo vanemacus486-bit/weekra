@@ -1363,8 +1363,7 @@ class _WeekHourlyLayoutState extends State<_WeekHourlyLayout> {
                             compact: compact,
                             isSelected: _selectedEventId == originalEvent.id,
                             isManipulating:
-                                _movingEvent?.id == originalEvent.id ||
-                                _resizingEvent?.id == originalEvent.id,
+                                _movingEvent?.id == originalEvent.id,
                             onTap: () => _selectEvent(originalEvent),
                             onLongPressStart: (_) =>
                                 _startMoving(originalEvent),
