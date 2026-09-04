@@ -1650,14 +1650,10 @@ class _GridEvent extends StatelessWidget {
                       color: event.color.withValues(
                         alpha: isManipulating ? 0.42 : 0.22,
                       ),
-                      border: isSelected
-                          ? Border.all(color: _ink, width: 1.5)
-                          : BorderDirectional(
-                              start: BorderSide(
-                                color: event.color,
-                                width: compact ? 2 : 3,
-                              ),
-                            ),
+                      border: Border.all(
+                        color: isSelected ? _ink : event.color,
+                        width: isSelected ? 1.5 : (compact ? 2 : 3),
+                      ),
                       borderRadius: BorderRadius.circular(compact ? 5 : 7),
                       boxShadow: isSelected
                           ? const [
