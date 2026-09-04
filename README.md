@@ -64,13 +64,16 @@ The first UI slice is in place:
 - Current-day and current-time emphasis
 - Previous/next week navigation, including horizontal swipe
 - Responsive event blocks backed by a small domain model
+- Timepage-style direct manipulation in Hourly view: select or drag to create,
+  press and drag to move, and pull either event edge to resize
 - Working event form with date, time, location, and color
 - Offline JSON persistence in the app documents directory
 - Event detail, editing, and confirmed deletion flows
 - System-driven English and Simplified Chinese UI
 - Pseudo-localization plus small-screen and large-type layout tests
 
-Drag-to-create and drag-to-reschedule interactions are the next MVP slice.
+Direct event manipulation uses 15-minute snapping, tactile feedback, live
+previews, and a second tap to confirm a newly selected time range.
 
 ## Internationalization
 
