@@ -1589,7 +1589,7 @@ class _GridEvent extends StatelessWidget {
   final GestureLongPressStartCallback onLongPressStart;
   final GestureLongPressMoveUpdateCallback onLongPressMoveUpdate;
   final GestureLongPressEndCallback onLongPressEnd;
-  final GestureLongPressCancelCallback onLongPressCancel;
+  final VoidCallback onLongPressCancel;
   final ValueChanged<_ResizeEdge> onResizeStart;
   final GestureDragUpdateCallback onResizeUpdate;
   final GestureDragEndCallback onResizeEnd;
