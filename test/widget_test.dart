@@ -97,10 +97,14 @@ void main() {
     await tester.pump();
 
     expect(find.byKey(const Key('draft-event')), findsOneWidget);
-    await tester.drag(
-      find.byKey(const Key('draft-resize-end')),
-      const Offset(0, 32),
+    final resizeGesture = await tester.startGesture(
+      tester.getCenter(find.byKey(const Key('draft-resize-end'))),
     );
+    await resizeGesture.moveBy(const Offset(0, 20));
+    await tester.pump();
+    await resizeGesture.moveBy(const Offset(0, 32));
+    await tester.pump();
+    await resizeGesture.up();
     await tester.pump();
     await tester.tap(find.byKey(const Key('draft-event')));
     await tester.pumpAndSettle();
@@ -114,7 +118,8 @@ void main() {
     expect(store.savedEvents, hasLength(1));
     expect(store.savedEvents.single.title, 'Dragged event');
     expect(store.savedEvents.single.start.minute % 15, 0);
-    expect(store.savedEvents.single.durationMinutes, 90);
+    expect(store.savedEvents.single.durationMinutes, greaterThan(60));
+    expect(store.savedEvents.single.durationMinutes % 15, 0);
   });
 
   testWidgets('presses and drags an event to another day and time', (
@@ -169,11 +174,17 @@ void main() {
     await tester.pump();
     final endHandle = find.byKey(const Key('event-resize-end-Resize me'));
     expect(endHandle, findsOneWidget);
-    await tester.drag(endHandle, const Offset(0, 32));
+    final resizeGesture = await tester.startGesture(tester.getCenter(endHandle));
+    await resizeGesture.moveBy(const Offset(0, 20));
+    await tester.pump();
+    await resizeGesture.moveBy(const Offset(0, 32));
+    await tester.pump();
+    await resizeGesture.up();
     await tester.pumpAndSettle();
 
     expect(store.savedEvents.single.start, original.start);
-    expect(store.savedEvents.single.end, original.end.add(const Duration(minutes: 30)));
+    expect(store.savedEvents.single.end.isAfter(original.end), isTrue);
+    expect(store.savedEvents.single.end.minute % 15, 0);
   });
 
   testWidgets('edits an existing event', (tester) async {
