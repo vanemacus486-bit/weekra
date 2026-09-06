@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:weekra/features/calendar/data/calendar_event_store.dart';
 import 'package:weekra/features/calendar/domain/calendar_event.dart';
+import 'package:weekra/app/weekra_theme.dart';
 import 'package:weekra/l10n/app_localizations.dart';
 
 const _accent = Color(0xFFFF6B5F);
@@ -27,9 +28,13 @@ class WeekScreen extends StatefulWidget {
   const WeekScreen({
     super.key,
     required this.eventStore,
+    this.theme = WeekraTheme.ember,
+    this.onOpenSettings,
   });
 
   final CalendarEventStore eventStore;
+  final WeekraTheme theme;
+  final VoidCallback? onOpenSettings;
 
   @override
   State<WeekScreen> createState() => _WeekScreenState();
@@ -216,11 +221,11 @@ class _WeekScreenState extends State<WeekScreen> {
 
     return Scaffold(
       body: DecoratedBox(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: AlignmentDirectional.topStart,
             end: AlignmentDirectional.bottomEnd,
-            colors: [Color(0xFF33181B), Color(0xFF111318), Color(0xFF090A0D)],
+            colors: widget.theme.background,
             stops: [0, 0.48, 1],
           ),
         ),
@@ -234,6 +239,7 @@ class _WeekScreenState extends State<WeekScreen> {
                 onNext: () => _moveWeek(1),
                 onToday: _returnToToday,
                 onLayoutChanged: _setLayout,
+                onSettings: widget.onOpenSettings,
               ),
               if (_storageError != null)
                 _StorageErrorBanner(
@@ -397,6 +403,7 @@ class _WeekToolbar extends StatelessWidget {
     required this.onNext,
     required this.onToday,
     required this.onLayoutChanged,
+    required this.onSettings,
   });
 
   final DateTime weekStart;
@@ -405,6 +412,7 @@ class _WeekToolbar extends StatelessWidget {
   final VoidCallback onNext;
   final VoidCallback onToday;
   final ValueChanged<_WeekLayout> onLayoutChanged;
+  final VoidCallback? onSettings;
 
   @override
   Widget build(BuildContext context) {
@@ -465,6 +473,13 @@ class _WeekToolbar extends StatelessWidget {
           onPressed: onNext,
           tooltip: l10n.nextWeekTooltip,
           icon: const Icon(Icons.chevron_right_rounded),
+        ),
+        IconButton(
+          key: const Key('open-settings'),
+          onPressed: onSettings,
+          tooltip: l10n.settingsTooltip,
+          style: IconButton.styleFrom(side: const BorderSide(color: _line)),
+          icon: const Icon(Icons.tune_rounded, size: 20),
         ),
       ],
     );
