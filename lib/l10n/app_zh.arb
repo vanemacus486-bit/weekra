@@ -64,5 +64,14 @@
   "seedEnglishPractice": "英语练习",
   "seedMvpReview": "MVP 复盘",
   "seedWorkout": "锻炼",
-  "seedEveningWalk": "晚间散步"
+  "seedEveningWalk": "晚间散步",
+  "settingsTooltip": "设置",
+  "settingsTitle": "设置",
+  "settingsAppearance": "外观",
+  "settingsLanguage": "语言",
+  "themeEmber": "余烬",
+  "themeLagoon": "泻湖",
+  "themeGraphite": "石墨",
+  "languageSystem": "跟随系统",
+  "settingsSavedAutomatically": "更改会自动保存在此设备上。"
 }
