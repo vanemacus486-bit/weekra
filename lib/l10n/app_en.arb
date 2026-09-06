@@ -78,5 +78,14 @@
   "seedEnglishPractice": "English practice",
   "seedMvpReview": "MVP review",
   "seedWorkout": "Workout",
-  "seedEveningWalk": "Evening walk"
+  "seedEveningWalk": "Evening walk",
+  "settingsTooltip": "Settings",
+  "settingsTitle": "Settings",
+  "settingsAppearance": "Appearance",
+  "settingsLanguage": "Language",
+  "themeEmber": "Ember",
+  "themeLagoon": "Lagoon",
+  "themeGraphite": "Graphite",
+  "languageSystem": "Follow system",
+  "settingsSavedAutomatically": "Changes are saved automatically on this device."
 }
