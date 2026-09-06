@@ -64,5 +64,14 @@
   "seedEnglishPractice": "⟦Focused English-language practice session⟧",
   "seedMvpReview": "⟦Review the complete MVP implementation⟧",
   "seedWorkout": "⟦Complete an evening workout session⟧",
-  "seedEveningWalk": "⟦Relaxing walk during the evening⟧"
+  "seedEveningWalk": "⟦Relaxing walk during the evening⟧",
+  "settingsTooltip": "⟦Settings control⟧",
+  "settingsTitle": "⟦Application settings page⟧",
+  "settingsAppearance": "⟦Appearance and visual theme⟧",
+  "settingsLanguage": "⟦Application language selection⟧",
+  "themeEmber": "⟦Warm ember color theme⟧",
+  "themeLagoon": "⟦Cool lagoon color theme⟧",
+  "themeGraphite": "⟦Neutral graphite color theme⟧",
+  "languageSystem": "⟦Follow the device system language⟧",
+  "settingsSavedAutomatically": "⟦Changes are saved automatically on this device⟧"
 }
