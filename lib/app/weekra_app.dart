@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:weekra/app/weekra_theme.dart';
 import 'package:weekra/features/calendar/data/calendar_event_store.dart';
 import 'package:weekra/features/calendar/presentation/week_screen.dart';
 import 'package:weekra/features/settings/data/app_settings_store.dart';
@@ -64,11 +65,11 @@ class _WeekraAppState extends State<WeekraApp> {
         barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
         barrierColor: Colors.black54,
         transitionDuration: const Duration(milliseconds: 260),
-        pageBuilder: (dialogContext, _, __) => Align(
+        pageBuilder: (dialogContext, _, _) => Align(
           alignment: AlignmentDirectional.centerEnd,
           child: SizedBox(width: 430, height: double.infinity, child: SettingsPanel(settings: _settings, onChanged: _changeSettings, onClose: () => Navigator.pop(dialogContext))),
         ),
-        transitionBuilder: (_, animation, __, child) => SlideTransition(position: Tween(begin: const Offset(1, 0), end: Offset.zero).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic)), child: child),
+        transitionBuilder: (_, animation, _, child) => SlideTransition(position: Tween(begin: const Offset(1, 0), end: Offset.zero).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic)), child: child),
       );
     } else {
       showModalBottomSheet<void>(
