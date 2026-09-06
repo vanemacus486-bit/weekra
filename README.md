@@ -70,6 +70,7 @@ The first UI slice is in place:
 - Offline JSON persistence in the app documents directory
 - Event detail, editing, and confirmed deletion flows
 - System-driven English and Simplified Chinese UI
+- Timepage-inspired settings page with instant theme and language changes
 - Pseudo-localization plus small-screen and large-type layout tests
 
 Direct event manipulation uses 15-minute snapping, tactile feedback, live
