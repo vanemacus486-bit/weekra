@@ -35,7 +35,21 @@ jobs:
         run: flutter gen-l10n
 
       - name: Render previews
-        run: flutter test --reporter expanded --update-goldens tool/preview_test.dart
+        shell: bash
+        run: |
+          set +e
+          flutter test --reporter expanded --update-goldens tool/preview_test.dart > preview-test.log 2>&1
+          test_status=$?
+          tail -n 300 preview-test.log > preview-test-tail.log
+          exit "$test_status"
+
+      - name: Upload preview diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: flutter-preview-diagnostics
+          path: preview-test-tail.log
+          retention-days: 2
 
       - name: Upload previews
         uses: actions/upload-artifact@v4
