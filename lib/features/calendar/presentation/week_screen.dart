@@ -1945,11 +1945,11 @@ class _GridEvent extends StatelessWidget {
                         ),
                         WeekraColors.surfaceRaised,
                       ),
-                      border: BorderDirectional(
-                        start: BorderSide(color: event.color, width: 2),
-                        top: BorderSide(color: selectionColor),
-                        end: BorderSide(color: selectionColor),
-                        bottom: BorderSide(color: selectionColor),
+                      border: Border.all(
+                        color: isSelected
+                            ? selectionColor
+                            : event.color.withValues(alpha: 0.3),
+                        width: isSelected ? 1 : 0.75,
                       ),
                       borderRadius: BorderRadius.circular(
                         WeekraMetrics.eventRadius,
