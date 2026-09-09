@@ -34,24 +34,24 @@ jobs:
       - name: Generate localizations
         run: flutter gen-l10n
 
-      - name: Render previews
-        shell: bash
-        run: |
-          set +e
-          flutter test --reporter expanded --update-goldens tool/preview_test.dart > preview-test.log 2>&1
-          test_status=$?
-          tail -n 300 preview-test.log > preview-test-tail.log
-          exit "$test_status"
+      - name: Render wide desktop
+        if: always()
+        run: flutter test --update-goldens tool/preview_test.dart --plain-name 'renders the wide desktop week'
 
-      - name: Upload preview diagnostics
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: flutter-preview-diagnostics
-          path: preview-test-tail.log
-          retention-days: 2
+      - name: Render crowded desktop
+        if: always()
+        run: flutter test --update-goldens tool/preview_test.dart --plain-name 'renders a crowded narrow desktop week'
+
+      - name: Render empty desktop
+        if: always()
+        run: flutter test --update-goldens tool/preview_test.dart --plain-name 'renders an empty desktop week'
+
+      - name: Render mobile agenda
+        if: always()
+        run: flutter test --update-goldens tool/preview_test.dart --plain-name 'renders the mobile agenda'
 
       - name: Upload previews
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: weekra-previews
