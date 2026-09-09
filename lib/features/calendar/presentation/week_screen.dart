@@ -627,12 +627,14 @@ class _WeekLayoutOption extends StatelessWidget {
               borderRadius: BorderRadius.circular(8),
             ),
             child: Row(
+              mainAxisSize: MainAxisSize.min,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(icon, size: 17, color: contentColor),
                 if (label != null) ...[
                   const SizedBox(width: 6),
-                  Flexible(
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 96),
                     child: Text(
                       label!,
                       maxLines: 1,
