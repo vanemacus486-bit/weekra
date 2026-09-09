@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:weekra/app/weekra_design.dart';
 import 'package:weekra/app/weekra_theme.dart';
 import 'package:weekra/features/calendar/data/calendar_event_store.dart';
 import 'package:weekra/features/calendar/presentation/week_screen.dart';
@@ -26,6 +27,7 @@ class WeekraApp extends StatefulWidget {
     this.updateService,
     this.enableAutomaticUpdates = true,
     this.settingsStore = const JsonAppSettingsStore(),
+    this.clock,
   });
 
   final CalendarEventStore eventStore;
@@ -35,6 +37,7 @@ class WeekraApp extends StatefulWidget {
   final UpdateService? updateService;
   final bool enableAutomaticUpdates;
   final AppSettingsStore settingsStore;
+  final DateTime Function()? clock;
 
   @override
   State<WeekraApp> createState() => _WeekraAppState();
@@ -100,22 +103,22 @@ class _WeekraAppState extends State<WeekraApp> {
               data: MediaQuery.of(context).copyWith(textScaler: widget.textScaler),
               child: child!,
             ),
-      theme: ThemeData(
-        brightness: Brightness.dark,
+      theme: WeekraDesign.dark(
         fontFamily: widget.fontFamily,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: accent,
-          brightness: Brightness.dark,
-          surface: const Color(0xFF15171C),
-        ),
-        scaffoldBackgroundColor: Colors.transparent,
-        useMaterial3: true,
+        accent: accent,
       ),
       home: UpdateCoordinator(
         updateService: widget.enableAutomaticUpdates
             ? widget.updateService ?? _defaultUpdateService()
             : null,
-        child: Builder(builder: (context) => WeekScreen(eventStore: widget.eventStore, theme: _settings.theme, onOpenSettings: () => _openSettings(context))),
+        child: Builder(
+          builder: (context) => WeekScreen(
+            eventStore: widget.eventStore,
+            theme: _settings.theme,
+            clock: widget.clock,
+            onOpenSettings: () => _openSettings(context),
+          ),
+        ),
       ),
     );
   }

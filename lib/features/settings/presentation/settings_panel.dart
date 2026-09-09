@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:weekra/app/weekra_design.dart';
 import 'package:weekra/app/weekra_theme.dart';
 import 'package:weekra/features/settings/domain/app_settings.dart';
 import 'package:weekra/l10n/app_localizations.dart';
@@ -14,7 +15,7 @@ class SettingsPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     return Material(
-      color: const Color(0xFF15171C),
+      color: WeekraColors.surface,
       child: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(28, 22, 24, 28),
@@ -41,7 +42,7 @@ class SettingsPanel extends StatelessWidget {
               _LanguageChoice(label: 'English', value: WeekraLanguage.english, settings: settings, onChanged: _setLanguage),
               _LanguageChoice(label: '简体中文', value: WeekraLanguage.chinese, settings: settings, onChanged: _setLanguage),
               const SizedBox(height: 28),
-              Text(l10n.settingsSavedAutomatically, style: const TextStyle(color: Color(0xFFA9A6A3), fontSize: 13)),
+              Text(l10n.settingsSavedAutomatically, style: const TextStyle(color: WeekraColors.textSecondary, fontSize: 13)),
             ],
           ),
         ),
@@ -55,7 +56,7 @@ class SettingsPanel extends StatelessWidget {
 
 class _SectionLabel extends StatelessWidget {
   const _SectionLabel(this.label); final String label;
-  @override Widget build(BuildContext context) => Text(label.toUpperCase(), style: const TextStyle(color: Color(0xFFA9A6A3), fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 1.7));
+  @override Widget build(BuildContext context) => Text(label.toUpperCase(), style: const TextStyle(color: WeekraColors.textSecondary, fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 1.7));
 }
 
 class _ThemeChoice extends StatelessWidget {
@@ -65,8 +66,8 @@ class _ThemeChoice extends StatelessWidget {
     final active = value == selected;
     return Expanded(child: InkWell(onTap: () => onTap(value), borderRadius: BorderRadius.circular(18), child: AnimatedContainer(
       duration: const Duration(milliseconds: 180), padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(color: active ? Colors.white.withValues(alpha: .1) : Colors.transparent, borderRadius: BorderRadius.circular(18), border: Border.all(color: active ? value.accent : Colors.white.withValues(alpha: .1))),
-      child: Column(children: [Container(height: 54, decoration: BoxDecoration(gradient: LinearGradient(colors: value.background), borderRadius: BorderRadius.circular(12))), const SizedBox(height: 9), Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: active ? Colors.white : const Color(0xFFA9A6A3), fontSize: 12))]),
+      decoration: BoxDecoration(color: active ? WeekraColors.surfaceRaised : Colors.transparent, borderRadius: BorderRadius.circular(18), border: Border.all(color: active ? value.accent : WeekraColors.outline)),
+      child: Column(children: [Container(height: 54, decoration: BoxDecoration(color: value.background.first, borderRadius: BorderRadius.circular(12))), const SizedBox(height: 9), Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: active ? WeekraColors.textPrimary : WeekraColors.textSecondary, fontSize: 12))]),
     )));
   }
 }

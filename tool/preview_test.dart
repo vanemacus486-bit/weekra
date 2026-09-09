@@ -8,52 +8,65 @@ import 'package:weekra/features/calendar/data/calendar_event_store.dart';
 import 'package:weekra/features/calendar/domain/calendar_event.dart';
 
 const _previewKey = Key('weekra-preview');
+final _fixedNow = DateTime(2026, 9, 9, 10, 32);
 
 void main() {
   setUpAll(_loadPreviewFonts);
 
-  testWidgets('renders the mobile week view', (tester) async {
-    await _pumpPreview(tester, const Size(430, 932));
+  testWidgets('renders the wide desktop week', (tester) async {
+    await _pumpPreview(
+      tester,
+      const Size(1920, 1080),
+      _previewEvents(crowded: false),
+    );
+
+    await expectLater(
+      find.byKey(_previewKey),
+      matchesGoldenFile('goldens/desktop-week-1920x1080.png'),
+    );
+  });
+
+  testWidgets('renders a crowded narrow desktop week', (tester) async {
+    await _pumpPreview(
+      tester,
+      const Size(1120, 760),
+      _previewEvents(crowded: true),
+    );
+
+    await expectLater(
+      find.byKey(_previewKey),
+      matchesGoldenFile('goldens/desktop-crowded-1120x760.png'),
+    );
+  });
+
+  testWidgets('renders an empty desktop week', (tester) async {
+    await _pumpPreview(tester, const Size(1280, 800), const []);
+
+    await expectLater(
+      find.byKey(_previewKey),
+      matchesGoldenFile('goldens/desktop-empty-1280x800.png'),
+    );
+  });
+
+  testWidgets('renders the mobile agenda', (tester) async {
+    await _pumpPreview(
+      tester,
+      const Size(430, 932),
+      _previewEvents(crowded: false),
+    );
 
     await expectLater(
       find.byKey(_previewKey),
       matchesGoldenFile('goldens/mobile-week.png'),
     );
   });
-
-  testWidgets('renders the mobile hourly week view', (tester) async {
-    await _pumpPreview(tester, const Size(430, 932));
-    await tester.tap(find.byKey(const Key('week-layout-hourly')));
-    await tester.pumpAndSettle();
-
-    await expectLater(
-      find.byKey(_previewKey),
-      matchesGoldenFile('goldens/mobile-week-hourly.png'),
-    );
-  });
-
-  testWidgets('renders mobile event details', (tester) async {
-    await _pumpPreview(tester, const Size(430, 932));
-    await tester.tap(find.text('Plan the week'));
-    await tester.pumpAndSettle();
-
-    await expectLater(
-      find.byKey(_previewKey),
-      matchesGoldenFile('goldens/mobile-event-details.png'),
-    );
-  });
-
-  testWidgets('renders the desktop week grid', (tester) async {
-    await _pumpPreview(tester, const Size(1280, 800));
-
-    await expectLater(
-      find.byKey(_previewKey),
-      matchesGoldenFile('goldens/desktop-week.png'),
-    );
-  });
 }
 
-Future<void> _pumpPreview(WidgetTester tester, Size size) async {
+Future<void> _pumpPreview(
+  WidgetTester tester,
+  Size size,
+  List<CalendarEvent> events,
+) async {
   tester.view.devicePixelRatio = 1;
   tester.view.physicalSize = size;
   addTearDown(tester.view.resetDevicePixelRatio);
@@ -63,9 +76,11 @@ Future<void> _pumpPreview(WidgetTester tester, Size size) async {
     RepaintBoundary(
       key: _previewKey,
       child: WeekraApp(
-        eventStore: _PreviewEventStore(_previewEvents()),
+        eventStore: _PreviewEventStore(events),
         fontFamily: 'WeekraPreview',
         locale: const Locale('en'),
+        clock: () => _fixedNow,
+        enableAutomaticUpdates: false,
       ),
     ),
   );
@@ -103,70 +118,108 @@ Future<void> _loadFont(String family, String path) async {
   await loader.load();
 }
 
-List<CalendarEvent> _previewEvents() {
-  final now = DateTime.now();
-  final weekStart = DateTime(now.year, now.month, now.day).subtract(
-    Duration(days: now.weekday - DateTime.monday),
-  );
+List<CalendarEvent> _previewEvents({required bool crowded}) {
+  final weekStart = DateTime(2026, 9, 7);
 
   DateTime at(int dayIndex, int hour, [int minute = 0]) {
     final day = weekStart.add(Duration(days: dayIndex));
     return DateTime(day.year, day.month, day.day, hour, minute);
   }
 
-  return [
+  final events = <CalendarEvent>[
     CalendarEvent(
-      id: 'plan',
-      title: 'Plan the week',
+      id: 'all-day',
+      title: 'Product launch window',
+      start: at(2, 0),
+      end: at(3, 0),
+      color: const Color(0xFFB7799E),
+    ),
+    CalendarEvent(
+      id: 'standup',
+      title: 'Stand-up',
       start: at(0, 9),
-      end: at(0, 10),
-      color: const Color(0xFFFF7B6F),
-      location: 'Library',
+      end: at(0, 9, 20),
+      color: const Color(0xFFF1776C),
     ),
     CalendarEvent(
       id: 'deep-work',
       title: 'Weekra deep work',
       start: at(0, 14),
       end: at(0, 16),
-      color: const Color(0xFF63C8C2),
+      color: const Color(0xFF70B8AF),
     ),
     CalendarEvent(
-      id: 'class',
-      title: 'Systems class',
+      id: 'long-title',
+      title: 'Review the desktop information architecture and final copy',
       start: at(1, 10, 30),
       end: at(1, 12),
-      color: const Color(0xFF8A9CF4),
-      location: 'Room 302',
+      color: const Color(0xFF7F9DD4),
+      location: 'Design studio · Room 302',
     ),
     CalendarEvent(
-      id: 'english',
-      title: 'English practice',
-      start: at(2, 15),
-      end: at(2, 16),
-      color: const Color(0xFFF0B55A),
+      id: 'overlap-a',
+      title: 'Research synthesis',
+      start: at(2, 10),
+      end: at(2, 11, 30),
+      color: const Color(0xFFC6A15B),
     ),
     CalendarEvent(
-      id: 'review',
-      title: 'MVP review',
-      start: at(3, 11),
-      end: at(3, 11, 45),
-      color: const Color(0xFFE882B4),
+      id: 'overlap-b',
+      title: 'Partner call',
+      start: at(2, 10, 30),
+      end: at(2, 12),
+      color: const Color(0xFF70B8AF),
+    ),
+    CalendarEvent(
+      id: 'overlap-c',
+      title: 'Quick review',
+      start: at(2, 11),
+      end: at(2, 11, 45),
+      color: const Color(0xFFF1776C),
+    ),
+    CalendarEvent(
+      id: 'workshop',
+      title: 'Prototype workshop',
+      start: at(3, 13),
+      end: at(3, 16, 30),
+      color: const Color(0xFF7F9DD4),
+      location: 'Project room',
     ),
     CalendarEvent(
       id: 'workout',
       title: 'Workout',
       start: at(4, 18),
       end: at(4, 19, 15),
-      color: const Color(0xFF67C47B),
-    ),
-    CalendarEvent(
-      id: 'walk',
-      title: 'Evening walk',
-      start: at(6, 19),
-      end: at(6, 20),
-      color: const Color(0xFF74A9E8),
+      color: const Color(0xFF72A57C),
     ),
   ];
+
+  if (crowded) {
+    events.addAll([
+      CalendarEvent(
+        id: 'crowded-1',
+        title: 'Content review',
+        start: at(1, 9),
+        end: at(1, 11),
+        color: const Color(0xFFB7799E),
+      ),
+      CalendarEvent(
+        id: 'crowded-2',
+        title: 'Engineering sync',
+        start: at(1, 9, 30),
+        end: at(1, 10, 45),
+        color: const Color(0xFF70B8AF),
+      ),
+      CalendarEvent(
+        id: 'crowded-3',
+        title: 'Roadmap',
+        start: at(3, 14),
+        end: at(3, 15),
+        color: const Color(0xFFF1776C),
+      ),
+    ]);
+  }
+  return events;
 }
 
 class _PreviewEventStore implements CalendarEventStore {
@@ -175,7 +228,7 @@ class _PreviewEventStore implements CalendarEventStore {
   final List<CalendarEvent> events;
 
   @override
-  Future<List<CalendarEvent>?> load() async => events;
+  Future<List<CalendarEvent>?> load() async => List.of(events);
 
   @override
   Future<void> save(List<CalendarEvent> events) async {}

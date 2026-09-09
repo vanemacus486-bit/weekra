@@ -73,5 +73,6 @@
   "themeLagoon": "⟦Cool lagoon color theme⟧",
   "themeGraphite": "⟦Neutral graphite color theme⟧",
   "languageSystem": "⟦Follow the device system language⟧",
-  "settingsSavedAutomatically": "⟦Changes are saved automatically on this device⟧"
+  "settingsSavedAutomatically": "⟦Changes are saved automatically on this device⟧",
+  "allDay": "⟦All-day calendar item⟧"
 }

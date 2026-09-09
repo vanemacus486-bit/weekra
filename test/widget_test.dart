@@ -20,6 +20,55 @@ void main() {
     expect(find.byType(FloatingActionButton), findsOneWidget);
   });
 
+  testWidgets('does not write preview data when storage is absent', (
+    tester,
+  ) async {
+    final store = _MemoryEventStore.absent();
+    await tester.pumpWidget(
+      WeekraApp(
+        eventStore: store,
+        locale: const Locale('en'),
+        enableAutomaticUpdates: false,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(store.saveCalls, 0);
+    expect(find.byKey(const Key('week-hourly-layout')), findsOneWidget);
+  });
+
+  testWidgets('lays overlapping events out in separate lanes', (tester) async {
+    _useViewport(tester, const Size(1000, 900));
+    final first = _eventAtStartOfWeek('Overlap A');
+    final second = CalendarEvent(
+      id: 'Overlap B',
+      title: 'Overlap B',
+      start: first.start.add(const Duration(minutes: 30)),
+      end: first.end.add(const Duration(minutes: 30)),
+      color: const Color(0xFF70B8AF),
+    );
+    await tester.pumpWidget(
+      WeekraApp(
+        eventStore: _MemoryEventStore([first, second]),
+        locale: const Locale('en'),
+        enableAutomaticUpdates: false,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final firstRect = tester.getRect(
+      find.byKey(const Key('hourly-event-Overlap A')),
+    );
+    final secondRect = tester.getRect(
+      find.byKey(const Key('hourly-event-Overlap B')),
+    );
+    expect(
+      firstRect.right <= secondRect.left ||
+          secondRect.right <= firstRect.left,
+      isTrue,
+    );
+  });
+
   testWidgets('switches between Grid and Hourly on a phone', (tester) async {
     _useViewport(tester, const Size(390, 844));
     final store = _MemoryEventStore([
@@ -314,15 +363,25 @@ void _useViewport(WidgetTester tester, Size size) {
 
 class _MemoryEventStore implements CalendarEventStore {
   _MemoryEventStore([List<CalendarEvent> initialEvents = const []])
-      : savedEvents = List.of(initialEvents);
+      : savedEvents = List.of(initialEvents),
+        _returnsNull = false;
+
+  _MemoryEventStore.absent()
+      : savedEvents = [],
+        _returnsNull = true;
 
   List<CalendarEvent> savedEvents;
+  bool _returnsNull;
+  int saveCalls = 0;
 
   @override
-  Future<List<CalendarEvent>?> load() async => List.of(savedEvents);
+  Future<List<CalendarEvent>?> load() async =>
+      _returnsNull ? null : List.of(savedEvents);
 
   @override
   Future<void> save(List<CalendarEvent> events) async {
+    saveCalls += 1;
+    _returnsNull = false;
     savedEvents = List.of(events);
   }
 }

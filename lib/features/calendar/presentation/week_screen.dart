@@ -2,15 +2,17 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:weekra/app/weekra_design.dart';
+import 'package:weekra/app/weekra_theme.dart';
 import 'package:weekra/features/calendar/data/calendar_event_store.dart';
 import 'package:weekra/features/calendar/domain/calendar_event.dart';
-import 'package:weekra/app/weekra_theme.dart';
 import 'package:weekra/l10n/app_localizations.dart';
 
-const _accent = Color(0xFFFF6B5F);
-const _ink = Color(0xFFF7F3EF);
-const _mutedInk = Color(0xFFA9A6A3);
-const _line = Color(0x24FFFFFF);
+const _ink = WeekraColors.textPrimary;
+const _mutedInk = WeekraColors.textSecondary;
+const _tertiaryInk = WeekraColors.textTertiary;
+const _line = WeekraColors.divider;
+const _subtleLine = WeekraColors.dividerSubtle;
 const _gridSnapMinutes = 15;
 const _minimumEventMinutes = 15;
 const _defaultEventMinutes = 60;
@@ -30,16 +32,17 @@ class WeekScreen extends StatefulWidget {
     required this.eventStore,
     this.theme = WeekraTheme.ember,
     this.onOpenSettings,
+    this.clock,
   });
 
   final CalendarEventStore eventStore;
   final WeekraTheme theme;
   final VoidCallback? onOpenSettings;
+  final DateTime Function()? clock;
 
   @override
   State<WeekScreen> createState() => _WeekScreenState();
 }
-
 class _WeekScreenState extends State<WeekScreen> {
   late DateTime _weekStart;
   _WeekLayout _layout = _WeekLayout.grid;
@@ -52,7 +55,7 @@ class _WeekScreenState extends State<WeekScreen> {
   @override
   void initState() {
     super.initState();
-    _weekStart = _startOfWeek(DateTime.now());
+    _weekStart = _startOfWeek(_now());
   }
 
   @override
@@ -74,10 +77,7 @@ class _WeekScreenState extends State<WeekScreen> {
   Future<void> _loadEvents(AppLocalizations l10n) async {
     try {
       final storedEvents = await widget.eventStore.load();
-      final events = storedEvents ?? _seedEvents(_weekStart, l10n);
-      if (storedEvents == null) {
-        await widget.eventStore.save(events);
-      }
+      final events = storedEvents ?? const <CalendarEvent>[];
       if (!mounted) {
         return;
       }
@@ -196,7 +196,7 @@ class _WeekScreenState extends State<WeekScreen> {
 
   void _returnToToday() {
     setState(() {
-      _weekStart = _startOfWeek(DateTime.now());
+      _weekStart = _startOfWeek(_now());
     });
   }
 
@@ -210,6 +210,7 @@ class _WeekScreenState extends State<WeekScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final now = _now();
     final days = List.generate(
       7,
       (index) => _weekStart.add(Duration(days: index)),
@@ -220,16 +221,8 @@ class _WeekScreenState extends State<WeekScreen> {
     }).toList();
 
     return Scaffold(
-      body: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: AlignmentDirectional.topStart,
-            end: AlignmentDirectional.bottomEnd,
-            colors: widget.theme.background,
-            stops: [0, 0.48, 1],
-          ),
-        ),
-        child: SafeArea(
+      backgroundColor: WeekraColors.canvas,
+      body: SafeArea(
           child: Column(
             children: [
               _WeekToolbar(
@@ -268,6 +261,7 @@ class _WeekScreenState extends State<WeekScreen> {
                                 ? _WeekHourlyLayout(
                                     days: days,
                                     events: events,
+                                    now: now,
                                     onEventTap: _openEvent,
                                     onCreateEvent: ({
                                       required start,
@@ -281,6 +275,7 @@ class _WeekScreenState extends State<WeekScreen> {
                                 : _WeekGridSummary(
                                     days: days,
                                     events: events,
+                                    today: now,
                                     onEventTap: _openEvent,
                                   ),
                           ),
@@ -289,80 +284,16 @@ class _WeekScreenState extends State<WeekScreen> {
               ),
             ],
           ),
-        ),
       ),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: FloatingActionButton.small(
         onPressed: _isLoading ? null : () => _createEvent(),
-        backgroundColor: _ink,
-        foregroundColor: const Color(0xFF17181C),
         tooltip: l10n.newEventTooltip,
-        child: const Icon(Icons.add_rounded, size: 30),
+        child: const Icon(Icons.add_rounded, size: 24),
       ),
     );
   }
 
-  List<CalendarEvent> _seedEvents(
-    DateTime weekStart,
-    AppLocalizations l10n,
-  ) {
-    DateTime at(int dayIndex, int hour, [int minute = 0]) {
-      final day = weekStart.add(Duration(days: dayIndex));
-      return DateTime(day.year, day.month, day.day, hour, minute);
-    }
-
-    return [
-      CalendarEvent(
-        id: 'weekly-plan',
-        title: l10n.seedPlanWeek,
-        start: at(0, 9),
-        end: at(0, 10),
-        color: const Color(0xFFFF7B6F),
-      ),
-      CalendarEvent(
-        id: 'deep-work',
-        title: l10n.seedDeepWork,
-        start: at(0, 14),
-        end: at(0, 16),
-        color: const Color(0xFF63C8C2),
-      ),
-      CalendarEvent(
-        id: 'class',
-        title: l10n.seedSystemsClass,
-        start: at(1, 10, 30),
-        end: at(1, 12),
-        color: const Color(0xFF8A9CF4),
-        location: l10n.seedRoom302,
-      ),
-      CalendarEvent(
-        id: 'english',
-        title: l10n.seedEnglishPractice,
-        start: at(2, 15),
-        end: at(2, 16),
-        color: const Color(0xFFF0B55A),
-      ),
-      CalendarEvent(
-        id: 'review',
-        title: l10n.seedMvpReview,
-        start: at(3, 11),
-        end: at(3, 11, 45),
-        color: const Color(0xFFE882B4),
-      ),
-      CalendarEvent(
-        id: 'workout',
-        title: l10n.seedWorkout,
-        start: at(4, 18),
-        end: at(4, 19, 15),
-        color: const Color(0xFF67C47B),
-      ),
-      CalendarEvent(
-        id: 'walk',
-        title: l10n.seedEveningWalk,
-        start: at(6, 19),
-        end: at(6, 20),
-        color: const Color(0xFF74A9E8),
-      ),
-    ];
-  }
+  DateTime _now() => widget.clock?.call() ?? DateTime.now();
 }
 
 class _StorageErrorBanner extends StatelessWidget {
@@ -424,101 +355,105 @@ class _WeekToolbar extends StatelessWidget {
       children: [
         Text(
           l10n.weekToolbarEyebrow,
-          maxLines: 2,
+          maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: const TextStyle(
-            color: _mutedInk,
-            fontSize: 11,
-            height: 1.25,
+            color: _tertiaryInk,
+            fontSize: 10,
+            height: 1.2,
             fontWeight: FontWeight.w700,
-            letterSpacing: 1.6,
+            letterSpacing: 1.45,
           ),
         ),
-        const SizedBox(height: 5),
+        const SizedBox(height: 4),
         Text(
           _weekLabel(materialL10n, weekStart),
-          maxLines: 2,
+          maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: const TextStyle(
             color: _ink,
-            fontSize: 25,
-            height: 1.15,
-            fontWeight: FontWeight.w500,
-            letterSpacing: -0.8,
+            fontSize: 23,
+            height: 1.1,
+            fontWeight: FontWeight.w600,
+            letterSpacing: -0.55,
+            fontFeatures: [FontFeature.tabularFigures()],
           ),
-        ),
-      ],
-    );
-
-    final navigation = Wrap(
-      alignment: WrapAlignment.end,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      spacing: 2,
-      runSpacing: 4,
-      children: [
-        TextButton(
-          onPressed: onToday,
-          child: Text(
-            l10n.today,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-        IconButton(
-          onPressed: onPrevious,
-          tooltip: l10n.previousWeekTooltip,
-          icon: const Icon(Icons.chevron_left_rounded),
-        ),
-        IconButton(
-          onPressed: onNext,
-          tooltip: l10n.nextWeekTooltip,
-          icon: const Icon(Icons.chevron_right_rounded),
-        ),
-        IconButton(
-          key: const Key('open-settings'),
-          onPressed: onSettings,
-          tooltip: l10n.settingsTooltip,
-          style: IconButton.styleFrom(side: const BorderSide(color: _line)),
-          icon: const Icon(Icons.tune_rounded, size: 20),
         ),
       ],
     );
 
     return Padding(
-      padding: const EdgeInsetsDirectional.fromSTEB(22, 18, 14, 12),
+      padding: const EdgeInsetsDirectional.fromSTEB(
+        WeekraMetrics.pageGutter,
+        14,
+        18,
+        12,
+      ),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final scaledBody = MediaQuery.textScalerOf(context).scale(16);
-          final shouldStack = constraints.maxWidth < 440 || scaledBody > 21;
-          final switcher = SizedBox(
-            width: math.min(constraints.maxWidth, 300),
-            child: _WeekLayoutSwitcher(
-              layout: layout,
-              onChanged: onLayoutChanged,
-            ),
+          final textScaler = MediaQuery.textScalerOf(context);
+          final shouldStack =
+              constraints.maxWidth < 680 || textScaler.scale(14) > 18;
+          final showSwitcherLabels =
+              constraints.maxWidth >= 900 && textScaler.scale(12) <= 15;
+          final todayLabelWidth = _singleLineTextWidth(
+            context,
+            l10n.today,
+            const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+          );
+          final navigation = _WeekNavigation(
+            compact: todayLabelWidth >
+                (constraints.maxWidth < 420 ? 76 : 120),
+            onPrevious: onPrevious,
+            onToday: onToday,
+            onNext: onNext,
+          );
+          final actions = Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _WeekLayoutSwitcher(
+                layout: layout,
+                showLabels: showSwitcherLabels,
+                onChanged: onLayoutChanged,
+              ),
+              const SizedBox(width: 8),
+              _ToolbarSurface(
+                child: IconButton(
+                  key: const Key('open-settings'),
+                  onPressed: onSettings,
+                  tooltip: l10n.settingsTooltip,
+                  icon: const Icon(Icons.tune_rounded, size: 19),
+                ),
+              ),
+            ],
           );
 
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (shouldStack) ...[
-                heading,
-                const SizedBox(height: 4),
-                Align(
-                  alignment: AlignmentDirectional.centerEnd,
-                  child: navigation,
-                ),
-              ] else
+          if (shouldStack) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
                 Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     Expanded(child: heading),
-                    const SizedBox(width: 8),
-                    Flexible(child: navigation),
+                    navigation,
                   ],
                 ),
-              const SizedBox(height: 10),
-              switcher,
+                const SizedBox(height: 10),
+                Align(
+                  alignment: AlignmentDirectional.centerEnd,
+                  child: actions,
+                ),
+              ],
+            );
+          }
+
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(child: heading),
+              navigation,
+              const SizedBox(width: 10),
+              actions,
             ],
           );
         },
@@ -527,13 +462,91 @@ class _WeekToolbar extends StatelessWidget {
   }
 }
 
+class _WeekNavigation extends StatelessWidget {
+  const _WeekNavigation({
+    required this.compact,
+    required this.onPrevious,
+    required this.onToday,
+    required this.onNext,
+  });
+
+  final bool compact;
+  final VoidCallback onPrevious;
+  final VoidCallback onToday;
+  final VoidCallback onNext;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final accent = Theme.of(context).colorScheme.primary;
+    return _ToolbarSurface(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            onPressed: onPrevious,
+            tooltip: l10n.previousWeekTooltip,
+            icon: const Icon(Icons.chevron_left_rounded, size: 20),
+          ),
+          if (compact)
+            IconButton(
+              onPressed: onToday,
+              tooltip: l10n.today,
+              color: accent,
+              icon: const Icon(Icons.today_outlined, size: 18),
+            )
+          else
+            TextButton(
+              onPressed: onToday,
+              style: TextButton.styleFrom(
+                foregroundColor: accent,
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+              ),
+              child: Text(
+                l10n.today,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          IconButton(
+            onPressed: onNext,
+            tooltip: l10n.nextWeekTooltip,
+            icon: const Icon(Icons.chevron_right_rounded, size: 20),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ToolbarSurface extends StatelessWidget {
+  const _ToolbarSurface({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: WeekraMetrics.controlHeight,
+      decoration: BoxDecoration(
+        color: WeekraColors.surface,
+        borderRadius: BorderRadius.circular(WeekraMetrics.controlRadius),
+        border: Border.all(color: _subtleLine),
+      ),
+      child: child,
+    );
+  }
+}
+
 class _WeekLayoutSwitcher extends StatelessWidget {
   const _WeekLayoutSwitcher({
     required this.layout,
+    required this.showLabels,
     required this.onChanged,
   });
 
   final _WeekLayout layout;
+  final bool showLabels;
   final ValueChanged<_WeekLayout> onChanged;
 
   @override
@@ -542,33 +555,25 @@ class _WeekLayoutSwitcher extends StatelessWidget {
     return Semantics(
       container: true,
       label: l10n.weekLayoutPickerLabel,
-      child: Container(
-        constraints: const BoxConstraints(minHeight: 42),
-        padding: const EdgeInsets.all(3),
-        decoration: BoxDecoration(
-          color: const Color(0x66000000),
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: _line),
-        ),
+      child: _ToolbarSurface(
         child: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Expanded(
-              child: _WeekLayoutOption(
-                key: const Key('week-layout-hourly'),
-                icon: Icons.view_week_outlined,
-                label: l10n.weekLayoutHourly,
-                selected: layout == _WeekLayout.hourly,
-                onTap: () => onChanged(_WeekLayout.hourly),
-              ),
+            _WeekLayoutOption(
+              key: const Key('week-layout-hourly'),
+              icon: Icons.view_week_outlined,
+              label: showLabels ? l10n.weekLayoutHourly : null,
+              semanticLabel: l10n.weekLayoutHourly,
+              selected: layout == _WeekLayout.hourly,
+              onTap: () => onChanged(_WeekLayout.hourly),
             ),
-            Expanded(
-              child: _WeekLayoutOption(
-                key: const Key('week-layout-grid'),
-                icon: Icons.grid_view_rounded,
-                label: l10n.weekLayoutGrid,
-                selected: layout == _WeekLayout.grid,
-                onTap: () => onChanged(_WeekLayout.grid),
-              ),
+            _WeekLayoutOption(
+              key: const Key('week-layout-grid'),
+              icon: Icons.grid_view_rounded,
+              label: showLabels ? l10n.weekLayoutGrid : null,
+              semanticLabel: l10n.weekLayoutGrid,
+              selected: layout == _WeekLayout.grid,
+              onTap: () => onChanged(_WeekLayout.grid),
             ),
           ],
         ),
@@ -582,57 +587,66 @@ class _WeekLayoutOption extends StatelessWidget {
     super.key,
     required this.icon,
     required this.label,
+    required this.semanticLabel,
     required this.selected,
     required this.onTap,
   });
 
   final IconData icon;
-  final String label;
+  final String? label;
+  final String semanticLabel;
   final bool selected;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final contentColor = selected ? const Color(0xFF17181C) : _mutedInk;
+    final accent = Theme.of(context).colorScheme.primary;
+    final contentColor = selected ? accent : _mutedInk;
     return Semantics(
       button: true,
       selected: selected,
+      label: semanticLabel,
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(8),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 180),
             curve: Curves.easeOutCubic,
-            constraints: const BoxConstraints(minHeight: 36),
-            padding: const EdgeInsetsDirectional.symmetric(
-              horizontal: 10,
-              vertical: 7,
+            height: WeekraMetrics.controlHeight - 4,
+            constraints: BoxConstraints(minWidth: label == null ? 40 : 78),
+            margin: const EdgeInsets.all(2),
+            padding: EdgeInsetsDirectional.symmetric(
+              horizontal: label == null ? 9 : 10,
             ),
             decoration: BoxDecoration(
-              color: selected ? _ink : Colors.transparent,
-              borderRadius: BorderRadius.circular(20),
+              color: selected
+                  ? accent.withValues(alpha: 0.12)
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(8),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(icon, size: 17, color: contentColor),
-                const SizedBox(width: 7),
-                Flexible(
-                  child: Text(
-                    label,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: contentColor,
-                      fontSize: 12,
-                      height: 1.15,
-                      fontWeight: FontWeight.w700,
+                if (label != null) ...[
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      label!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: contentColor,
+                        fontSize: 12,
+                        height: 1.15,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
-                ),
+                ],
               ],
             ),
           ),
@@ -646,11 +660,13 @@ class _WeekGridSummary extends StatelessWidget {
   const _WeekGridSummary({
     required this.days,
     required this.events,
+    required this.today,
     required this.onEventTap,
   });
 
   final List<DateTime> days;
   final List<CalendarEvent> events;
+  final DateTime today;
   final ValueChanged<CalendarEvent> onEventTap;
 
   @override
@@ -669,7 +685,7 @@ class _WeekGridSummary extends StatelessWidget {
         return _AgendaDay(
           day: day,
           events: dayEvents,
-          isToday: _isSameDay(day, DateTime.now()),
+          isToday: _isSameDay(day, today),
           onEventTap: onEventTap,
         );
       },
@@ -693,9 +709,14 @@ class _AgendaDay extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final accent = Theme.of(context).colorScheme.primary;
     return Container(
       constraints: const BoxConstraints(minHeight: 82),
       padding: const EdgeInsets.symmetric(vertical: 14),
+      decoration: BoxDecoration(
+        color: isToday ? accent.withValues(alpha: 0.035) : Colors.transparent,
+        borderRadius: BorderRadius.circular(10),
+      ),
       child: LayoutBuilder(
         builder: (context, constraints) => Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -714,7 +735,7 @@ class _AgendaDay extends StatelessWidget {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: isToday ? _accent : _mutedInk,
+                        color: isToday ? accent : _mutedInk,
                         fontSize: 10,
                         height: 1.2,
                         fontWeight: FontWeight.w700,
@@ -730,15 +751,15 @@ class _AgendaDay extends StatelessWidget {
                       padding: const EdgeInsets.all(5),
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
-                        color: isToday ? _accent : Colors.transparent,
+                        color: isToday ? accent : Colors.transparent,
                         shape: BoxShape.circle,
                       ),
                       child: Text(
                         '${day.day}',
                         maxLines: 1,
                         overflow: TextOverflow.visible,
-                        style: const TextStyle(
-                          color: _ink,
+                        style: TextStyle(
+                          color: isToday ? WeekraColors.onAccent : _ink,
                           fontSize: 21,
                           height: 1.1,
                           fontWeight: FontWeight.w500,
@@ -794,8 +815,10 @@ class _AgendaEvent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final start = _formatTime(context, event.startMinutes);
     final end = _formatTime(context, event.endMinutes);
+    final isAllDay = _isAllDayEvent(event);
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () => onTap(event),
@@ -811,7 +834,7 @@ class _AgendaEvent extends StatelessWidget {
           children: [
             Flexible(
               child: Text(
-                '$start\n$end',
+                isAllDay ? l10n.allDay : '$start\n$end',
                 maxLines: 2,
                 overflow: TextOverflow.fade,
                 softWrap: false,
@@ -867,6 +890,7 @@ class _WeekHourlyLayout extends StatefulWidget {
   const _WeekHourlyLayout({
     required this.days,
     required this.events,
+    required this.now,
     required this.onEventTap,
     required this.onCreateEvent,
     required this.onEventChanged,
@@ -874,6 +898,7 @@ class _WeekHourlyLayout extends StatefulWidget {
 
   final List<DateTime> days;
   final List<CalendarEvent> events;
+  final DateTime now;
   final ValueChanged<CalendarEvent> onEventTap;
   final _CreateEventCallback onCreateEvent;
   final ValueChanged<CalendarEvent> onEventChanged;
@@ -955,7 +980,7 @@ class _WeekHourlyLayoutState extends State<_WeekHourlyLayout> {
         title: '',
         start: start,
         end: start.add(const Duration(minutes: _defaultEventMinutes)),
-        color: _accent,
+        color: Theme.of(context).colorScheme.primary,
       );
     });
     HapticFeedback.selectionClick();
@@ -1017,7 +1042,7 @@ class _WeekHourlyLayoutState extends State<_WeekHourlyLayout> {
       title: '',
       start: _dateAtMinute(day, startMinute),
       end: _dateAtMinute(day, endMinute),
-      color: _accent,
+      color: Theme.of(context).colorScheme.primary,
     );
     if (current != _lastFeedbackStep) {
       _lastFeedbackStep = current;
@@ -1249,36 +1274,55 @@ class _WeekHourlyLayoutState extends State<_WeekHourlyLayout> {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final compact = constraints.maxWidth < 760;
-        final visibleRange = _visibleHourRange(widget.events);
+        final narrow = constraints.maxWidth < 900;
+        final allDayEvents =
+            widget.events.where(_isAllDayEvent).toList(growable: false);
+        final timedEvents = widget.events
+            .where((event) => !_isAllDayEvent(event))
+            .toList(growable: false);
+        final displayedTimedEvents =
+            timedEvents.map(_displayEvent).toList(growable: false);
+        final visibleRange = _visibleHourRange(displayedTimedEvents);
         final startHour = visibleRange.$1;
         final endHour = visibleRange.$2;
-        final hourHeight = compact ? 48.0 : 64.0;
+        final hourHeight = narrow ? 54.0 : 64.0;
         final gutterWidth = _timeGutterWidth(context, startHour, endHour);
         final columnWidth = (constraints.maxWidth - gutterWidth) / 7;
         final gridHeight = (endHour - startHour) * hourHeight;
+        final todayIndex = widget.days.indexWhere(
+          (day) => _isSameDay(day, widget.now),
+        );
 
         return Column(
           key: const Key('week-hourly-layout'),
           children: [
-            ConstrainedBox(
-              constraints: BoxConstraints(minHeight: compact ? 50 : 58),
-              child: Padding(
-                padding: EdgeInsets.symmetric(vertical: compact ? 5 : 8),
-                child: Row(
-                  children: [
-                    SizedBox(width: gutterWidth),
-                    for (final day in widget.days)
-                      Expanded(
-                        child: _GridDayHeader(
-                          day: day,
-                          isToday: _isSameDay(day, DateTime.now()),
-                        ),
+            SizedBox(
+              height: narrow ? 58 : 64,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  SizedBox(width: gutterWidth),
+                  for (final day in widget.days)
+                    Expanded(
+                      child: _GridDayHeader(
+                        day: day,
+                        isToday: _isSameDay(day, widget.now),
+                        narrow: narrow,
                       ),
-                  ],
-                ),
+                    ),
+                ],
               ),
             ),
+            if (allDayEvents.isNotEmpty) ...[
+              const Divider(height: 1, color: _subtleLine),
+              _AllDayBand(
+                days: widget.days,
+                events: allDayEvents,
+                today: widget.now,
+                gutterWidth: gutterWidth,
+                onEventTap: widget.onEventTap,
+              ),
+            ],
             const Divider(height: 1, color: _line),
             Expanded(
               child: SingleChildScrollView(
@@ -1292,146 +1336,145 @@ class _WeekHourlyLayoutState extends State<_WeekHourlyLayout> {
                       key: _gridKey,
                       behavior: HitTestBehavior.opaque,
                       onTapUp: (details) => _selectNewSlot(
-                      details.globalPosition,
-                      gutterWidth: gutterWidth,
-                      columnWidth: columnWidth,
-                      startHour: startHour,
-                      endHour: endHour,
-                      hourHeight: hourHeight,
-                    ),
+                        details.globalPosition,
+                        gutterWidth: gutterWidth,
+                        columnWidth: columnWidth,
+                        startHour: startHour,
+                        endHour: endHour,
+                        hourHeight: hourHeight,
+                      ),
                       onLongPressStart: (details) => _startCreating(
-                      details.globalPosition,
-                      gutterWidth: gutterWidth,
-                      columnWidth: columnWidth,
-                      startHour: startHour,
-                      endHour: endHour,
-                      hourHeight: hourHeight,
-                    ),
+                        details.globalPosition,
+                        gutterWidth: gutterWidth,
+                        columnWidth: columnWidth,
+                        startHour: startHour,
+                        endHour: endHour,
+                        hourHeight: hourHeight,
+                      ),
                       onLongPressMoveUpdate: (details) => _updateCreating(
-                      details.globalPosition,
-                      startHour: startHour,
-                      endHour: endHour,
-                      hourHeight: hourHeight,
-                    ),
+                        details.globalPosition,
+                        startHour: startHour,
+                        endHour: endHour,
+                        hourHeight: hourHeight,
+                      ),
                       onLongPressEnd: (_) => _finishCreating(),
                       onLongPressCancel: _finishCreating,
                       child: Stack(
                         clipBehavior: Clip.none,
                         children: [
-                      for (var hour = startHour; hour <= endHour; hour++)
-                        PositionedDirectional(
-                          top: (hour - startHour) * hourHeight,
-                          start: 0,
-                          end: 0,
-                          child: Row(
-                            children: [
-                              SizedBox(
-                                width: gutterWidth,
-                                child: Padding(
-                                  padding: const EdgeInsetsDirectional.only(
-                                    end: 8,
-                                  ),
-                                  child: Text(
-                                    _formatTime(context, hour * 60),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.visible,
-                                    softWrap: false,
-                                    textAlign: TextAlign.end,
-                                    style: const TextStyle(
-                                      color: _mutedInk,
-                                      fontSize: 10,
-                                      height: 1.2,
-                                      fontFeatures: [
-                                        FontFeature.tabularFigures(),
-                                      ],
-                                    ),
-                                  ),
-                                ),
+                          if (todayIndex >= 0)
+                            PositionedDirectional(
+                              start: gutterWidth + todayIndex * columnWidth,
+                              top: 0,
+                              bottom: 0,
+                              width: columnWidth,
+                              child: ColoredBox(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .primary
+                                    .withValues(alpha: 0.035),
                               ),
-                              const Expanded(
-                                child: Divider(height: 1, color: _line),
-                              ),
-                            ],
-                          ),
-                        ),
-                      for (var index = 0; index <= 7; index++)
-                        PositionedDirectional(
-                          start: gutterWidth + (columnWidth * index),
-                          top: 0,
-                          bottom: 0,
-                          child: const VerticalDivider(width: 1, color: _line),
-                        ),
-                      for (final originalEvent in widget.events)
-                        if (_displayEvent(originalEvent).endMinutes >
-                                startHour * 60 &&
-                            _displayEvent(originalEvent).startMinutes <
-                                endHour * 60)
-                          _GridEvent(
-                            event: _displayEvent(originalEvent),
-                            dayIndex: _displayEvent(
-                              originalEvent,
-                            ).dayIndexIn(widget.days.first),
-                            columnWidth: columnWidth,
-                            gutterWidth: gutterWidth,
-                            startHour: startHour,
-                            hourHeight: hourHeight,
-                            compact: compact,
-                            isSelected: _selectedEventId == originalEvent.id,
-                            isManipulating:
-                                _movingEvent?.id == originalEvent.id,
-                            onTap: () => _selectEvent(originalEvent),
-                            onLongPressStart: (_) =>
-                                _startMoving(originalEvent),
-                            onLongPressMoveUpdate: (details) => _updateMoving(
-                              details,
+                            ),
+                          for (var hour = startHour;
+                              hour <= endHour;
+                              hour++)
+                            _HourRule(
+                              top: (hour - startHour) * hourHeight,
                               gutterWidth: gutterWidth,
+                              label: _formatTime(context, hour * 60),
+                            ),
+                          for (var index = 1; index < 7; index++)
+                            PositionedDirectional(
+                              start: gutterWidth + columnWidth * index,
+                              top: 0,
+                              bottom: 0,
+                              child: const VerticalDivider(
+                                width: 1,
+                                color: _subtleLine,
+                              ),
+                            ),
+                          for (final placement
+                              in _eventPlacements(displayedTimedEvents))
+                            Builder(
+                              builder: (context) {
+                                final displayedEvent = placement.event;
+                                final originalEvent = widget.events.firstWhere(
+                                  (event) => event.id == displayedEvent.id,
+                                );
+                                return _GridEvent(
+                                  event: displayedEvent,
+                                  dayIndex: displayedEvent.dayIndexIn(
+                                    widget.days.first,
+                                  ),
+                                  lane: placement.lane,
+                                  laneCount: placement.laneCount,
+                                  columnWidth: columnWidth,
+                                  gutterWidth: gutterWidth,
+                                  startHour: startHour,
+                                  hourHeight: hourHeight,
+                                  narrow: narrow,
+                                  isSelected:
+                                      _selectedEventId == originalEvent.id,
+                                  isManipulating:
+                                      _movingEvent?.id == originalEvent.id,
+                                  onTap: () => _selectEvent(originalEvent),
+                                  onLongPressStart: (_) =>
+                                      _startMoving(originalEvent),
+                                  onLongPressMoveUpdate: (details) =>
+                                      _updateMoving(
+                                    details,
+                                    gutterWidth: gutterWidth,
+                                    columnWidth: columnWidth,
+                                    startHour: startHour,
+                                    endHour: endHour,
+                                    hourHeight: hourHeight,
+                                  ),
+                                  onLongPressEnd: (_) => _finishMoving(),
+                                  onLongPressCancel: _cancelMoving,
+                                  onResizeStart: (edge) =>
+                                      _startResizing(originalEvent, edge),
+                                  onResizeUpdate: (details) => _updateResizing(
+                                    details,
+                                    startHour: startHour,
+                                    endHour: endHour,
+                                    hourHeight: hourHeight,
+                                  ),
+                                  onResizeEnd: (_) => _finishResizing(),
+                                  onResizeCancel: _cancelResizing,
+                                );
+                              },
+                            ),
+                          if (_draftEvent case final draft?)
+                            _GridDraftEvent(
+                              event: draft,
+                              dayIndex: draft.dayIndexIn(widget.days.first),
+                              columnWidth: columnWidth,
+                              gutterWidth: gutterWidth,
+                              startHour: startHour,
+                              hourHeight: hourHeight,
+                              compact: narrow,
+                              onTap: _confirmDraft,
+                              onResizeStart: (edge) =>
+                                  _startDraftResizing(draft, edge),
+                              onResizeUpdate: (details) => _updateDraftResize(
+                                details,
+                                startHour: startHour,
+                                endHour: endHour,
+                                hourHeight: hourHeight,
+                              ),
+                              onResizeEnd: (_) => _finishDraftResize(),
+                              onResizeCancel: _cancelDraftResize,
+                            ),
+                          if (todayIndex >= 0)
+                            _CurrentTimeLine(
+                              now: widget.now,
+                              todayIndex: todayIndex,
                               columnWidth: columnWidth,
                               startHour: startHour,
                               endHour: endHour,
                               hourHeight: hourHeight,
+                              gutterWidth: gutterWidth,
                             ),
-                            onLongPressEnd: (_) => _finishMoving(),
-                            onLongPressCancel: _cancelMoving,
-                            onResizeStart: (edge) =>
-                                _startResizing(originalEvent, edge),
-                            onResizeUpdate: (details) => _updateResizing(
-                              details,
-                              startHour: startHour,
-                              endHour: endHour,
-                              hourHeight: hourHeight,
-                            ),
-                            onResizeEnd: (_) => _finishResizing(),
-                            onResizeCancel: _cancelResizing,
-                          ),
-                      if (_draftEvent case final draft?)
-                        _GridDraftEvent(
-                          event: draft,
-                          dayIndex: draft.dayIndexIn(widget.days.first),
-                          columnWidth: columnWidth,
-                          gutterWidth: gutterWidth,
-                          startHour: startHour,
-                          hourHeight: hourHeight,
-                          compact: compact,
-                          onTap: _confirmDraft,
-                          onResizeStart: (edge) =>
-                              _startDraftResizing(draft, edge),
-                          onResizeUpdate: (details) => _updateDraftResize(
-                            details,
-                            startHour: startHour,
-                            endHour: endHour,
-                            hourHeight: hourHeight,
-                          ),
-                          onResizeEnd: (_) => _finishDraftResize(),
-                          onResizeCancel: _cancelDraftResize,
-                        ),
-                      if (_weekContainsToday(widget.days))
-                        _CurrentTimeLine(
-                          gridWidth: constraints.maxWidth,
-                          startHour: startHour,
-                          endHour: endHour,
-                          hourHeight: hourHeight,
-                          gutterWidth: gutterWidth,
-                        ),
                         ],
                       ),
                     ),
@@ -1528,42 +1571,259 @@ class _WeekHourlyLayoutState extends State<_WeekHourlyLayout> {
 }
 
 class _GridDayHeader extends StatelessWidget {
-  const _GridDayHeader({required this.day, required this.isToday});
+  const _GridDayHeader({
+    required this.day,
+    required this.isToday,
+    required this.narrow,
+  });
 
   final DateTime day;
   final bool isToday;
+  final bool narrow;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Text(
-          _weekdayShortName(l10n, day.weekday),
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: isToday ? _accent : _mutedInk,
-            fontSize: 10,
-            height: 1.1,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 1,
+    final accent = Theme.of(context).colorScheme.primary;
+    return Container(
+      color: isToday ? accent.withValues(alpha: 0.045) : Colors.transparent,
+      padding: EdgeInsets.symmetric(vertical: narrow ? 7 : 8),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            _weekdayShortName(l10n, day.weekday),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: isToday ? accent : _mutedInk,
+              fontSize: narrow ? 9 : 10,
+              height: 1.1,
+              fontWeight: FontWeight.w700,
+              letterSpacing: narrow ? 0.55 : 0.85,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Container(
+            width: narrow ? 26 : 29,
+            height: narrow ? 26 : 29,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: isToday ? accent : Colors.transparent,
+              shape: BoxShape.circle,
+            ),
+            child: Text(
+              '${day.day}',
+              maxLines: 1,
+              overflow: TextOverflow.visible,
+              style: TextStyle(
+                color: isToday ? WeekraColors.onAccent : _ink,
+                fontSize: narrow ? 16 : 18,
+                height: 1,
+                fontWeight: FontWeight.w600,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AllDayBand extends StatelessWidget {
+  const _AllDayBand({
+    required this.days,
+    required this.events,
+    required this.today,
+    required this.gutterWidth,
+    required this.onEventTap,
+  });
+
+  final List<DateTime> days;
+  final List<CalendarEvent> events;
+  final DateTime today;
+  final double gutterWidth;
+  final ValueChanged<CalendarEvent> onEventTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final accent = Theme.of(context).colorScheme.primary;
+    final byDay = List.generate(
+      7,
+      (index) => events
+          .where((event) => event.dayIndexIn(days.first) == index)
+          .toList(),
+    );
+    final maxCount = byDay.fold<int>(
+      0,
+      (largest, items) => math.max(largest, items.length),
+    );
+    final height = 10.0 + maxCount * 28 + math.max(0, maxCount - 1) * 3;
+
+    return Container(
+      height: height,
+      color: WeekraColors.surface.withValues(alpha: 0.46),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SizedBox(
+            width: gutterWidth,
+            child: Align(
+              alignment: AlignmentDirectional.topCenter,
+              child: Padding(
+                padding: const EdgeInsetsDirectional.only(top: 12, end: 5),
+                child: Text(
+                  l10n.allDay,
+                  maxLines: 1,
+                  overflow: TextOverflow.fade,
+                  softWrap: false,
+                  style: const TextStyle(
+                    color: _tertiaryInk,
+                    fontSize: 9,
+                    height: 1,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          for (var dayIndex = 0; dayIndex < 7; dayIndex++)
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 5),
+                color: _isSameDay(days[dayIndex], today)
+                    ? accent.withValues(alpha: 0.045)
+                    : Colors.transparent,
+                child: Column(
+                  children: [
+                    for (var index = 0;
+                        index < byDay[dayIndex].length;
+                        index++) ...[
+                      _AllDayEvent(
+                        event: byDay[dayIndex][index],
+                        onTap: onEventTap,
+                      ),
+                      if (index != byDay[dayIndex].length - 1)
+                        const SizedBox(height: 3),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AllDayEvent extends StatelessWidget {
+  const _AllDayEvent({required this.event, required this.onTap});
+
+  final CalendarEvent event;
+  final ValueChanged<CalendarEvent> onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: event.title,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => onTap(event),
+          borderRadius: BorderRadius.circular(6),
+          child: Container(
+            height: 28,
+            padding: const EdgeInsetsDirectional.symmetric(horizontal: 7),
+            decoration: BoxDecoration(
+              color: Color.alphaBlend(
+                event.color.withValues(alpha: 0.1),
+                WeekraColors.surfaceRaised,
+              ),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: event.color.withValues(alpha: 0.3)),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 5,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: event.color,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    event.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: _ink,
+                      fontSize: 11,
+                      height: 1.1,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
-        const SizedBox(height: 2),
-        Text(
-          '${day.day}',
-          maxLines: 1,
-          overflow: TextOverflow.visible,
-          style: TextStyle(
-            color: isToday ? _accent : _ink,
-            fontSize: 20,
-            fontWeight: FontWeight.w500,
+      ),
+    );
+  }
+}
+
+class _HourRule extends StatelessWidget {
+  const _HourRule({
+    required this.top,
+    required this.gutterWidth,
+    required this.label,
+  });
+
+  final double top;
+  final double gutterWidth;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return PositionedDirectional(
+      top: top,
+      start: 0,
+      end: 0,
+      child: Row(
+        children: [
+          SizedBox(
+            width: gutterWidth,
+            child: Transform.translate(
+              offset: const Offset(0, -6),
+              child: Padding(
+                padding: const EdgeInsetsDirectional.only(end: 9),
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.visible,
+                  softWrap: false,
+                  textAlign: TextAlign.end,
+                  style: const TextStyle(
+                    color: _tertiaryInk,
+                    fontSize: 10,
+                    height: 1.2,
+                    fontWeight: FontWeight.w500,
+                    fontFeatures: [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ),
+            ),
           ),
-        ),
-      ],
+          const Expanded(child: Divider(height: 1, color: _line)),
+        ],
+      ),
     );
   }
 }
@@ -1572,11 +1832,13 @@ class _GridEvent extends StatelessWidget {
   const _GridEvent({
     required this.event,
     required this.dayIndex,
+    required this.lane,
+    required this.laneCount,
     required this.columnWidth,
     required this.gutterWidth,
     required this.startHour,
     required this.hourHeight,
-    required this.compact,
+    required this.narrow,
     required this.isSelected,
     required this.isManipulating,
     required this.onTap,
@@ -1592,11 +1854,13 @@ class _GridEvent extends StatelessWidget {
 
   final CalendarEvent event;
   final int dayIndex;
+  final int lane;
+  final int laneCount;
   final double columnWidth;
   final double gutterWidth;
   final int startHour;
   final double hourHeight;
-  final bool compact;
+  final bool narrow;
   final bool isSelected;
   final bool isManipulating;
   final VoidCallback onTap;
@@ -1614,16 +1878,31 @@ class _GridEvent extends StatelessWidget {
     final visibleStart = math.max(event.startMinutes, startHour * 60);
     final visibleEnd = math.min(event.endMinutes, 24 * 60);
     final top = (visibleStart - startHour * 60) / 60 * hourHeight;
-    final bodyHeight = math.max(
-      compact ? 28.0 : 34.0,
-      (visibleEnd - visibleStart) / 60 * hourHeight,
-    ) - 4;
+    final rawHeight = (visibleEnd - visibleStart) / 60 * hourHeight;
+    final bodyHeight = math.max(28.0, rawHeight - 4);
     final handlePadding = isSelected && !isManipulating ? 12.0 : 0.0;
+    final outerInset = narrow ? 2.0 : 5.0;
+    const laneGap = 2.0;
+    final usableWidth = columnWidth - outerInset * 2;
+    final laneWidth = math.max(
+      12.0,
+      (usableWidth - laneGap * (laneCount - 1)) / laneCount,
+    );
+    final start = gutterWidth +
+        dayIndex * columnWidth +
+        outerInset +
+        lane * (laneWidth + laneGap);
+    final startLabel = _formatTime(context, event.startMinutes);
+    final timeRange =
+        '$startLabel – ${_formatTime(context, event.endMinutes)}';
+    final isShort = bodyHeight < 44;
+    final showInlineTime = isShort && laneWidth >= 96;
+    final selectionColor = isSelected ? _ink : Colors.transparent;
 
     return PositionedDirectional(
-      start: gutterWidth + dayIndex * columnWidth + (compact ? 2 : 4),
+      start: start,
       top: top + 2 - handlePadding,
-      width: columnWidth - (compact ? 4 : 8),
+      width: laneWidth,
       height: bodyHeight + handlePadding * 2,
       child: Stack(
         clipBehavior: Clip.none,
@@ -1636,11 +1915,10 @@ class _GridEvent extends StatelessWidget {
             child: Semantics(
               button: true,
               selected: isSelected,
-              label:
-                  '${event.title}, ${_formatTime(context, event.startMinutes)}',
+              label: '${event.title}, $timeRange',
               hint: AppLocalizations.of(context).moveEventHint,
               child: AnimatedScale(
-                scale: isManipulating ? 1.025 : 1,
+                scale: isManipulating ? 1.015 : 1,
                 duration: const Duration(milliseconds: 120),
                 curve: Curves.easeOutCubic,
                 child: GestureDetector(
@@ -1655,61 +1933,115 @@ class _GridEvent extends StatelessWidget {
                     duration: const Duration(milliseconds: 120),
                     curve: Curves.easeOutCubic,
                     padding: EdgeInsetsDirectional.fromSTEB(
-                      compact ? 5 : 8,
-                      compact ? 4 : 6,
-                      compact ? 3 : 6,
-                      compact ? 3 : 5,
+                      narrow ? 5 : 7,
+                      isShort ? 4 : 6,
+                      narrow ? 4 : 6,
+                      isShort ? 3 : 5,
                     ),
                     decoration: BoxDecoration(
-                      color: event.color.withValues(
-                        alpha: isManipulating ? 0.42 : 0.22,
+                      color: Color.alphaBlend(
+                        event.color.withValues(
+                          alpha: isManipulating ? 0.18 : 0.1,
+                        ),
+                        WeekraColors.surfaceRaised,
                       ),
-                      border: Border.all(
-                        color: isSelected ? _ink : event.color,
-                        width: isSelected ? 1.5 : (compact ? 2 : 3),
+                      border: BorderDirectional(
+                        start: BorderSide(color: event.color, width: 2),
+                        top: BorderSide(color: selectionColor),
+                        end: BorderSide(color: selectionColor),
+                        bottom: BorderSide(color: selectionColor),
                       ),
-                      borderRadius: BorderRadius.circular(compact ? 5 : 7),
+                      borderRadius: BorderRadius.circular(
+                        WeekraMetrics.eventRadius,
+                      ),
                       boxShadow: isSelected
                           ? const [
                               BoxShadow(
-                                color: Color(0x66000000),
-                                blurRadius: 12,
-                                offset: Offset(0, 4),
+                                color: Color(0x3D000000),
+                                blurRadius: 8,
+                                offset: Offset(0, 3),
                               ),
                             ]
                           : null,
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          event.title,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: _ink,
-                            fontSize: compact ? 9 : 12,
-                            fontWeight: FontWeight.w600,
-                            height: 1.1,
+                    child: isShort
+                        ? Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  event.title,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: _ink,
+                                    fontSize: narrow ? 9.5 : 11.5,
+                                    height: 1.1,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                              if (showInlineTime) ...[
+                                const SizedBox(width: 5),
+                                Text(
+                                  startLabel,
+                                  maxLines: 1,
+                                  style: const TextStyle(
+                                    color: _mutedInk,
+                                    fontSize: 9,
+                                    height: 1,
+                                    fontFeatures: [
+                                      FontFeature.tabularFigures(),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ],
+                          )
+                        : Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                event.title,
+                                maxLines: bodyHeight >= 82 ? 2 : 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: _ink,
+                                  fontSize: narrow ? 10.5 : 12.5,
+                                  height: 1.15,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                timeRange,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                softWrap: false,
+                                style: TextStyle(
+                                  color: _mutedInk,
+                                  fontSize: narrow ? 8.5 : 10,
+                                  height: 1.1,
+                                  fontFeatures: const [
+                                    FontFeature.tabularFigures(),
+                                  ],
+                                ),
+                              ),
+                              if (event.location != null &&
+                                  bodyHeight >= 86) ...[
+                                const SizedBox(height: 5),
+                                Text(
+                                  event.location!,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: _tertiaryInk,
+                                    fontSize: narrow ? 8.5 : 10,
+                                    height: 1.1,
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
-                        ),
-                        if (!compact && bodyHeight >= 50) ...[
-                          const SizedBox(height: 3),
-                          Text(
-                            '${_formatTime(context, event.startMinutes)} – '
-                            '${_formatTime(context, event.endMinutes)}',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            softWrap: false,
-                            style: const TextStyle(
-                              color: _mutedInk,
-                              fontSize: 10,
-                              height: 1.2,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
                   ),
                 ),
               ),
@@ -1808,7 +2140,10 @@ class _GridDraftEvent extends StatelessWidget {
                     compact ? 3 : 5,
                   ),
                   decoration: BoxDecoration(
-                    color: _accent.withValues(alpha: 0.4),
+                    color: Theme.of(context)
+                        .colorScheme
+                        .primary
+                        .withValues(alpha: 0.24),
                     border: Border.all(color: _ink, width: 1.5),
                     borderRadius: BorderRadius.circular(compact ? 5 : 7),
                     boxShadow: const [
@@ -1838,7 +2173,7 @@ class _GridDraftEvent extends StatelessWidget {
           _GridResizeHandle(
             key: const Key('draft-resize-start'),
             edge: _ResizeEdge.start,
-            color: _accent,
+            color: Theme.of(context).colorScheme.primary,
             semanticLabel: AppLocalizations.of(context).resizeEventStart,
             onStart: onResizeStart,
             onUpdate: onResizeUpdate,
@@ -1848,7 +2183,7 @@ class _GridDraftEvent extends StatelessWidget {
           _GridResizeHandle(
             key: const Key('draft-resize-end'),
             edge: _ResizeEdge.end,
-            color: _accent,
+            color: Theme.of(context).colorScheme.primary,
             semanticLabel: AppLocalizations.of(context).resizeEventEnd,
             onStart: onResizeStart,
             onUpdate: onResizeUpdate,
@@ -1923,14 +2258,18 @@ class _GridResizeHandle extends StatelessWidget {
 
 class _CurrentTimeLine extends StatelessWidget {
   const _CurrentTimeLine({
-    required this.gridWidth,
+    required this.now,
+    required this.todayIndex,
+    required this.columnWidth,
     required this.startHour,
     required this.endHour,
     required this.hourHeight,
     required this.gutterWidth,
   });
 
-  final double gridWidth;
+  final DateTime now;
+  final int todayIndex;
+  final double columnWidth;
   final int startHour;
   final int endHour;
   final double hourHeight;
@@ -1938,25 +2277,34 @@ class _CurrentTimeLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final now = DateTime.now();
     final minutes = now.hour * 60 + now.minute;
     if (minutes < startHour * 60 || minutes > endHour * 60) {
       return const SizedBox.shrink();
     }
     final top = (minutes - startHour * 60) / 60 * hourHeight;
+    final accent = Theme.of(context).colorScheme.primary;
 
     return PositionedDirectional(
-      start: gutterWidth - 4,
-      top: top,
-      width: gridWidth - gutterWidth + 4,
+      start: gutterWidth + todayIndex * columnWidth - 3,
+      top: top - 3,
+      width: columnWidth + 3,
+      height: 7,
       child: Row(
         children: [
           Container(
-            width: 8,
-            height: 8,
-            decoration: const BoxDecoration(color: _accent, shape: BoxShape.circle),
+            width: 7,
+            height: 7,
+            decoration: BoxDecoration(
+              color: accent,
+              shape: BoxShape.circle,
+            ),
           ),
-          const Expanded(child: Divider(height: 1, thickness: 1, color: _accent)),
+          Expanded(
+            child: Container(
+              height: 1.25,
+              color: accent,
+            ),
+          ),
         ],
       ),
     );
@@ -1985,12 +2333,12 @@ class _EventEditorSheet extends StatefulWidget {
 
 class _EventEditorSheetState extends State<_EventEditorSheet> {
   static const _eventColors = [
-    Color(0xFFFF7B6F),
-    Color(0xFF63C8C2),
-    Color(0xFF8A9CF4),
-    Color(0xFFF0B55A),
-    Color(0xFFE882B4),
-    Color(0xFF67C47B),
+    Color(0xFFF1776C),
+    Color(0xFF70B8AF),
+    Color(0xFF7F9DD4),
+    Color(0xFFC6A15B),
+    Color(0xFFB7799E),
+    Color(0xFF72A57C),
   ];
 
   final _titleController = TextEditingController();
@@ -2517,7 +2865,7 @@ Future<_EventAction?> _showEventDetailsSheet(
   return showModalBottomSheet<_EventAction>(
     context: context,
     isScrollControlled: true,
-    backgroundColor: const Color(0xFF1B1D22),
+    backgroundColor: WeekraColors.surface,
     showDragHandle: false,
     builder: (context) => _EventDetailsSheet(event: event),
   );
@@ -2572,7 +2920,7 @@ Future<CalendarEvent?> _showEventEditorSheet(
   return showModalBottomSheet<CalendarEvent>(
     context: context,
     isScrollControlled: true,
-    backgroundColor: const Color(0xFF1B1D22),
+    backgroundColor: WeekraColors.surface,
     showDragHandle: false,
     builder: (context) => _EventEditorSheet(
       weekStart: weekStart,
@@ -2627,9 +2975,81 @@ bool _isSameDay(DateTime a, DateTime b) {
   return a.year == b.year && a.month == b.month && a.day == b.day;
 }
 
-bool _weekContainsToday(List<DateTime> days) {
-  final today = DateTime.now();
-  return days.any((day) => _isSameDay(day, today));
+bool _isAllDayEvent(CalendarEvent event) {
+  return event.start.hour == 0 &&
+      event.start.minute == 0 &&
+      event.durationMinutes >= 23 * 60;
+}
+
+class _EventPlacement {
+  const _EventPlacement({
+    required this.event,
+    required this.lane,
+    required this.laneCount,
+  });
+
+  final CalendarEvent event;
+  final int lane;
+  final int laneCount;
+}
+
+class _LaneAssignment {
+  const _LaneAssignment(this.event, this.lane);
+
+  final CalendarEvent event;
+  final int lane;
+}
+
+List<_EventPlacement> _eventPlacements(Iterable<CalendarEvent> source) {
+  final byDay = <int, List<CalendarEvent>>{};
+  for (final event in source) {
+    final dayKey = event.start.year * 10000 + event.start.month * 100 + event.start.day;
+    byDay.putIfAbsent(dayKey, () => []).add(event);
+  }
+
+  final placements = <_EventPlacement>[];
+  for (final dayEvents in byDay.values) {
+    dayEvents.sort((a, b) => a.startMinutes.compareTo(b.startMinutes));
+    final group = <CalendarEvent>[];
+    var groupEnd = -1;
+
+    void placeGroup() {
+      if (group.isEmpty) return;
+      final laneEnds = <int>[];
+      final assignments = <_LaneAssignment>[];
+      for (final event in group) {
+        var lane = laneEnds.indexWhere((end) => end <= event.startMinutes);
+        if (lane == -1) {
+          lane = laneEnds.length;
+          laneEnds.add(event.endMinutes);
+        } else {
+          laneEnds[lane] = event.endMinutes;
+        }
+        assignments.add(_LaneAssignment(event, lane));
+      }
+      for (final assignment in assignments) {
+        placements.add(
+          _EventPlacement(
+            event: assignment.event,
+            lane: assignment.lane,
+            laneCount: laneEnds.length,
+          ),
+        );
+      }
+      group.clear();
+    }
+
+    for (final event in dayEvents) {
+      if (group.isNotEmpty && event.startMinutes >= groupEnd) {
+        placeGroup();
+        groupEnd = -1;
+      }
+      group.add(event);
+      groupEnd = math.max(groupEnd, event.endMinutes);
+    }
+    placeGroup();
+  }
+  return placements;
 }
 
 (int, int) _visibleHourRange(List<CalendarEvent> events) {
@@ -2670,6 +3090,22 @@ double _timeGutterWidth(BuildContext context, int startHour, int endHour) {
     painter.dispose();
   }
   return widest + 16;
+}
+
+double _singleLineTextWidth(
+  BuildContext context,
+  String text,
+  TextStyle style,
+) {
+  final painter = TextPainter(
+    text: TextSpan(text: text, style: style),
+    maxLines: 1,
+    textDirection: Directionality.of(context),
+    textScaler: MediaQuery.textScalerOf(context),
+  )..layout();
+  final width = painter.width;
+  painter.dispose();
+  return width;
 }
 
 String _weekLabel(

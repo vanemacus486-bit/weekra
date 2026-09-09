@@ -73,5 +73,6 @@
   "themeLagoon": "泻湖",
   "themeGraphite": "石墨",
   "languageSystem": "跟随系统",
-  "settingsSavedAutomatically": "更改会自动保存在此设备上。"
+  "settingsSavedAutomatically": "更改会自动保存在此设备上。",
+  "allDay": "全天"
 }

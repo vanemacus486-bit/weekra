@@ -87,5 +87,6 @@
   "themeLagoon": "Lagoon",
   "themeGraphite": "Graphite",
   "languageSystem": "Follow system",
-  "settingsSavedAutomatically": "Changes are saved automatically on this device."
+  "settingsSavedAutomatically": "Changes are saved automatically on this device.",
+  "allDay": "All day"
 }
