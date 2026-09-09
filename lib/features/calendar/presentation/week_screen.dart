@@ -496,17 +496,10 @@ class _WeekNavigation extends StatelessWidget {
               icon: const Icon(Icons.today_outlined, size: 18),
             )
           else
-            TextButton(
+            _TodayButton(
               onPressed: onToday,
-              style: TextButton.styleFrom(
-                foregroundColor: accent,
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-              ),
-              child: Text(
-                l10n.today,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
+              label: l10n.today,
+              color: accent,
             ),
           IconButton(
             onPressed: onNext,
@@ -514,6 +507,55 @@ class _WeekNavigation extends StatelessWidget {
             icon: const Icon(Icons.chevron_right_rounded, size: 20),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _TodayButton extends StatelessWidget {
+  const _TodayButton({
+    required this.onPressed,
+    required this.label,
+    required this.color,
+  });
+
+  final VoidCallback onPressed;
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: label,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onPressed,
+          borderRadius: BorderRadius.circular(8),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              minWidth: 58,
+              minHeight: WeekraMetrics.controlHeight,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              child: Center(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 13,
+                    height: 1.1,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -1803,7 +1845,7 @@ class _HourRule extends StatelessWidget {
           SizedBox(
             width: gutterWidth,
             child: Transform.translate(
-              offset: const Offset(0, -6),
+              offset: Offset(0, top == 0 ? 2 : -6),
               child: Padding(
                 padding: const EdgeInsetsDirectional.only(end: 9),
                 child: Text(
@@ -1899,6 +1941,7 @@ class _GridEvent extends StatelessWidget {
         '$startLabel – ${_formatTime(context, event.endMinutes)}';
     final isShort = bodyHeight < 44;
     final showInlineTime = isShort && laneWidth >= 96;
+    final isCramped = laneWidth < 70;
     final selectionColor = isSelected ? _ink : Colors.transparent;
 
     return PositionedDirectional(
@@ -2004,7 +2047,11 @@ class _GridEvent extends StatelessWidget {
                             children: [
                               Text(
                                 event.title,
-                                maxLines: bodyHeight >= 82 ? 2 : 1,
+                                maxLines: isCramped
+                                    ? 1
+                                    : bodyHeight >= 82
+                                        ? 2
+                                        : 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
                                   color: _ink,
@@ -2013,21 +2060,23 @@ class _GridEvent extends StatelessWidget {
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
-                              const SizedBox(height: 3),
-                              Text(
-                                timeRange,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                softWrap: false,
-                                style: TextStyle(
-                                  color: _mutedInk,
-                                  fontSize: narrow ? 8.5 : 10,
-                                  height: 1.1,
-                                  fontFeatures: const [
-                                    FontFeature.tabularFigures(),
-                                  ],
+                              if (!isCramped) ...[
+                                const SizedBox(height: 3),
+                                Text(
+                                  timeRange,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  softWrap: false,
+                                  style: TextStyle(
+                                    color: _mutedInk,
+                                    fontSize: narrow ? 8.5 : 10,
+                                    height: 1.1,
+                                    fontFeatures: const [
+                                      FontFeature.tabularFigures(),
+                                    ],
+                                  ),
                                 ),
-                              ),
+                              ],
                               if (event.location != null &&
                                   bodyHeight >= 86) ...[
                                 const SizedBox(height: 5),
