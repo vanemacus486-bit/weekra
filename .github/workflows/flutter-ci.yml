@@ -43,7 +43,20 @@ jobs:
 
       - name: Test overlap lanes
         if: always()
-        run: flutter test --plain-name 'lays overlapping events out in separate lanes'
+        shell: bash
+        run: |
+          set +e
+          flutter test --reporter expanded --plain-name 'lays overlapping events out in separate lanes' > overlap-test.log 2>&1
+          test_status=$?
+          exit "$test_status"
+
+      - name: Upload overlap diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: overlap-test-log
+          path: overlap-test.log
+          retention-days: 2
 
       - name: Test mobile layout switch
         if: always()
