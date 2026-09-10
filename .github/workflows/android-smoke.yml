@@ -55,36 +55,28 @@ jobs:
             adb shell settings put system accelerometer_rotation 0
             adb shell settings put system user_rotation 0
 
-            launch_weekra() {
-              adb shell am force-stop com.example.weekra
-              adb shell monkey -p com.example.weekra 1 >/dev/null
-              sleep "$1"
-            }
-
             # First launch includes shader/JIT warm-up; later scenarios relaunch
             # independently so a missed tap cannot leave the remaining captures
             # on the Android launcher.
-            launch_weekra 25
+            adb shell am force-stop com.example.weekra
+            adb shell monkey -p com.example.weekra 1 >/dev/null
+            sleep 25
             adb exec-out screencap -p >android-smoke/01-mobile-overview.png
 
             # Open the first Monday event in the agenda overview.
             adb shell input tap 620 525
             sleep 2
             adb exec-out screencap -p >android-smoke/02-mobile-event-details.png
-            if cmp -s android-smoke/01-mobile-overview.png android-smoke/02-mobile-event-details.png; then
-              echo "Event details did not open" >&2
-              exit 1
-            fi
+            if cmp -s android-smoke/01-mobile-overview.png android-smoke/02-mobile-event-details.png; then echo "Event details did not open" >&2; exit 1; fi
 
-            launch_weekra 4
+            adb shell am force-stop com.example.weekra
+            adb shell monkey -p com.example.weekra 1 >/dev/null
+            sleep 4
             # The switcher's left half is the hourly layout at this density.
             adb shell input tap 710 355
             sleep 2
             adb exec-out screencap -p >android-smoke/03-mobile-hourly.png
-            if cmp -s android-smoke/01-mobile-overview.png android-smoke/03-mobile-hourly.png; then
-              echo "Hourly layout did not open" >&2
-              exit 1
-            fi
+            if cmp -s android-smoke/01-mobile-overview.png android-smoke/03-mobile-hourly.png; then echo "Hourly layout did not open" >&2; exit 1; fi
 
             # Long-press and drag an empty Friday slot to create a live draft.
             adb shell input motionevent DOWN 735 970
