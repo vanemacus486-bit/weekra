@@ -1,0 +1,89 @@
+name: Android smoke screenshots
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'lib/**'
+      - 'tool/desktop_smoke_main.dart'
+      - '.github/workflows/android-smoke.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  android-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Build Android APK
+        run: |
+          flutter pub get
+          flutter gen-l10n
+          flutter create --platforms=android --project-name weekra .
+          flutter build apk --debug --target tool/desktop_smoke_main.dart
+
+      - name: Launch, interact, and capture
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: false
+          emulator-options: -no-snapshot -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: |
+            set -euo pipefail
+            mkdir -p android-smoke
+            adb install -r build/app/outputs/flutter-apk/app-debug.apk
+            adb shell wm size 1080x2400
+            adb shell wm density 420
+            adb shell settings put system accelerometer_rotation 0
+            adb shell settings put system user_rotation 0
+            adb shell monkey -p com.example.weekra 1
+            sleep 12
+            adb exec-out screencap -p >android-smoke/01-mobile-overview.png
+
+            adb shell input tap 600 465
+            sleep 2
+            adb exec-out screencap -p >android-smoke/02-mobile-event-details.png
+            adb shell input keyevent KEYCODE_BACK
+            sleep 1
+
+            adb shell input tap 720 300
+            sleep 2
+            adb exec-out screencap -p >android-smoke/03-mobile-hourly.png
+
+            adb shell input motionevent DOWN 735 970
+            sleep 1
+            adb shell input motionevent MOVE 735 1140
+            sleep 0.2
+            adb shell input motionevent UP 735 1140
+            sleep 2
+            adb exec-out screencap -p >android-smoke/04-mobile-create-event.png
+
+            adb shell dumpsys window displays >android-smoke/window.txt
+            adb logcat -d -t 300 >android-smoke/logcat.txt
+            test -s android-smoke/01-mobile-overview.png
+            test -s android-smoke/02-mobile-event-details.png
+            test -s android-smoke/03-mobile-hourly.png
+            test -s android-smoke/04-mobile-create-event.png
+
+      - name: Upload screenshots and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: weekra-android-smoke
+          path: android-smoke
+          if-no-files-found: error
+          retention-days: 14
