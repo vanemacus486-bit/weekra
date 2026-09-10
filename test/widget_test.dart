@@ -161,6 +161,43 @@ void main() {
     _restoreTestPlatform();
   });
 
+  testWidgets('preserves an overnight event through the full editor', (
+    tester,
+  ) async {
+    _useViewport(tester, const Size(1280, 800));
+    _useDesktopPlatform();
+    final overnight = _interactionFixtures().last;
+    final store = _MemoryEventStore([overnight]);
+    await tester.pumpWidget(
+      WeekraApp(
+        eventStore: store,
+        locale: const Locale('en'),
+        enableAutomaticUpdates: false,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(
+      find.byKey(
+        const Key('hourly-event-fixture-overnight-continuation-6'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('edit-event')));
+    await tester.pumpAndSettle();
+
+    final nextDayChip = tester.widget<FilterChip>(
+      find.byKey(const Key('event-ends-next-day')),
+    );
+    expect(nextDayChip.selected, isTrue);
+    await tester.ensureVisible(find.byKey(const Key('save-event')));
+    await tester.tap(find.byKey(const Key('save-event')));
+    await tester.pumpAndSettle();
+
+    expect(store.savedEvents.single.durationMinutes, 180);
+    _restoreTestPlatform();
+  });
+
   testWidgets('keeps all seven columns usable at 125 percent display scale', (
     tester,
   ) async {

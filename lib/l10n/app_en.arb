@@ -39,6 +39,7 @@
   "locationOptionalLabel": "Location (optional)",
   "daySection": "DAY",
   "timeSection": "TIME",
+  "endsNextDayLabel": "Ends next day",
   "adjustEventTimeTitle": "Adjust time",
   "durationSection": "DURATION",
   "durationMinutes": "{minutes} min",

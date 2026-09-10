@@ -32,6 +32,7 @@
   "locationOptionalLabel": "地点（可选）",
   "daySection": "日期",
   "timeSection": "时间",
+  "endsNextDayLabel": "次日结束",
   "adjustEventTimeTitle": "调整时间",
   "durationSection": "时长",
   "durationMinutes": "{minutes} 分钟",

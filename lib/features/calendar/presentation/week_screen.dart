@@ -2822,6 +2822,7 @@ class _EventEditorSheetState extends State<_EventEditorSheet> {
   late DateTime _selectedDate;
   TimeOfDay _startTime = const TimeOfDay(hour: 9, minute: 0);
   TimeOfDay _endTime = const TimeOfDay(hour: 10, minute: 0);
+  bool _endsNextDay = false;
   Color _selectedColor = _eventColors.first;
   String? _validationMessage;
 
@@ -2839,6 +2840,7 @@ class _EventEditorSheetState extends State<_EventEditorSheet> {
       );
       _startTime = TimeOfDay.fromDateTime(existingEvent.start);
       _endTime = TimeOfDay.fromDateTime(existingEvent.end);
+      _endsNextDay = !_isSameDay(existingEvent.start, existingEvent.end);
       _selectedColor = existingEvent.color;
       return;
     }
@@ -2852,6 +2854,7 @@ class _EventEditorSheetState extends State<_EventEditorSheet> {
       );
       _startTime = TimeOfDay.fromDateTime(initialStart);
       _endTime = TimeOfDay.fromDateTime(initialEnd);
+      _endsNextDay = !_isSameDay(initialStart, initialEnd);
       return;
     }
     final today = DateTime.now();
@@ -2891,7 +2894,9 @@ class _EventEditorSheetState extends State<_EventEditorSheet> {
     final l10n = AppLocalizations.of(context);
     final title = _titleController.text.trim();
     final start = _atTime(_selectedDate, _startTime);
-    final end = _atTime(_selectedDate, _endTime);
+    final end = _atTime(_selectedDate, _endTime).add(
+      Duration(days: _endsNextDay ? 1 : 0),
+    );
 
     if (title.isEmpty) {
       setState(() => _validationMessage = l10n.eventTitleRequired);
@@ -3044,6 +3049,19 @@ class _EventEditorSheetState extends State<_EventEditorSheet> {
                 endTime: _endTime,
                 onStartPressed: () => _pickTime(isStart: true),
                 onEndPressed: () => _pickTime(isStart: false),
+              ),
+              const SizedBox(height: 8),
+              FilterChip(
+                key: const Key('event-ends-next-day'),
+                avatar: const Icon(Icons.nights_stay_outlined, size: 17),
+                label: Text(l10n.endsNextDayLabel),
+                selected: _endsNextDay,
+                onSelected: (selected) {
+                  setState(() {
+                    _endsNextDay = selected;
+                    _validationMessage = null;
+                  });
+                },
               ),
               const SizedBox(height: 18),
               Text(
