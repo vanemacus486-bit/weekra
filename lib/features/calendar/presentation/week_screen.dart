@@ -1730,7 +1730,7 @@ class _WeekHourlyLayoutState extends State<_WeekHourlyLayout> {
                                       : 'hourly-event-${originalEvent.id}'
                                           '-continuation-$segmentDayIndex';
                                   return _GridEvent(
-                                    key: ValueKey(segmentKey),
+                                    key: ValueKey('segment-$segmentKey'),
                                     eventKey: Key(segmentKey),
                                     event: displayedEvent,
                                     dayIndex: segmentDayIndex,
