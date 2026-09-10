@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:weekra/app/weekra_design.dart';
@@ -244,6 +245,7 @@ class _WeekScreenState extends State<WeekScreen> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final now = _now();
+    final desktopPointers = _usesDesktopPointerRules(context);
     final days = List.generate(
       7,
       (index) => _weekStart.add(Duration(days: index)),
@@ -277,13 +279,15 @@ class _WeekScreenState extends State<WeekScreen> {
                   ? const Center(child: CircularProgressIndicator())
                   : GestureDetector(
                       behavior: HitTestBehavior.opaque,
-                      onHorizontalDragEnd: (details) {
-                        final velocity = details.primaryVelocity ?? 0;
-                        if (velocity.abs() < 350) {
-                          return;
-                        }
-                        _moveWeek(velocity < 0 ? 1 : -1);
-                      },
+                      onHorizontalDragEnd: desktopPointers
+                          ? null
+                          : (details) {
+                              final velocity = details.primaryVelocity ?? 0;
+                              if (velocity.abs() < 350) {
+                                return;
+                              }
+                              _moveWeek(velocity < 0 ? 1 : -1);
+                            },
                       child: _WeekLayoutStage(
                         layout: _layout,
                         hourly: _WeekHourlyLayout(
@@ -1611,6 +1615,7 @@ class _WeekHourlyLayoutState extends State<_WeekHourlyLayout> {
                       child: GestureDetector(
                         key: _gridKey,
                         behavior: HitTestBehavior.opaque,
+                        dragStartBehavior: DragStartBehavior.down,
                         onTapUp: (details) {
                           _selectNewSlot(
                             details.globalPosition,
@@ -1723,8 +1728,9 @@ class _WeekHourlyLayoutState extends State<_WeekHourlyLayout> {
                                     narrow: narrow,
                                     isSelected:
                                         _selectedEventId == originalEvent.id,
-                                    isManipulating: _movingEvent?.id ==
-                                            originalEvent.id ||
+                                    isManipulating:
+                                        _movingEvent?.id == originalEvent.id,
+                                    isResizing:
                                         _resizingEvent?.id == originalEvent.id,
                                     desktopPointers: desktopPointers,
                                     onTap: (anchorRect) {
@@ -2170,6 +2176,7 @@ class _GridEvent extends StatelessWidget {
     required this.narrow,
     required this.isSelected,
     required this.isManipulating,
+    required this.isResizing,
     required this.desktopPointers,
     required this.onTap,
     required this.onSecondaryTap,
@@ -2194,6 +2201,7 @@ class _GridEvent extends StatelessWidget {
   final bool narrow;
   final bool isSelected;
   final bool isManipulating;
+  final bool isResizing;
   final bool desktopPointers;
   final ValueChanged<Rect> onTap;
   final ValueChanged<Rect> onSecondaryTap;
@@ -2241,7 +2249,7 @@ class _GridEvent extends StatelessWidget {
       top: positionedTop,
       width: laneWidth,
       height: bodyOffset + bodyHeight + handlePadding,
-      duration: isManipulating
+      duration: isManipulating || isResizing
           ? Duration.zero
           : WeekraMotion.resolve(context, WeekraMotion.control),
       curve: WeekraMotion.emphasized,
@@ -2270,6 +2278,7 @@ class _GridEvent extends StatelessWidget {
                     child: GestureDetector(
                       key: Key('hourly-event-${event.id}'),
                       behavior: HitTestBehavior.opaque,
+                      dragStartBehavior: DragStartBehavior.down,
                       onTapUp: (details) => onTap(
                         _globalRectFor(eventContext) ??
                             Rect.fromCenter(
@@ -2327,7 +2336,7 @@ class _GridEvent extends StatelessWidget {
                         decoration: BoxDecoration(
                           color: Color.alphaBlend(
                             event.color.withValues(
-                              alpha: isManipulating ? 0.18 : 0.1,
+                              alpha: isManipulating || isResizing ? 0.18 : 0.1,
                             ),
                             WeekraColors.surfaceRaised,
                           ),
@@ -2352,7 +2361,7 @@ class _GridEvent extends StatelessWidget {
                         ),
                         child: isTiny
                             ? const SizedBox.shrink()
-                            : isManipulating
+                            : isManipulating || isResizing
                                 ? Text(
                                     timeRange,
                                     maxLines: 2,

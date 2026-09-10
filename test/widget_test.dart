@@ -94,6 +94,7 @@ void main() {
     expect(find.text('Mon').hitTestable(), findsOneWidget);
     expect(find.text('Sun').hitTestable(), findsOneWidget);
     expect(tester.takeException(), isNull);
+    _restoreTestPlatform();
   });
 
   testWidgets('switches between Grid and Hourly on a phone', (tester) async {
@@ -190,6 +191,7 @@ void main() {
 
     expect(find.byKey(const Key('draft-event')), findsNothing);
     expect(store.savedEvents, isEmpty);
+    _restoreTestPlatform();
   });
 
   testWidgets('creates an event by dragging an empty desktop time range', (
@@ -234,6 +236,7 @@ void main() {
     expect(store.savedEvents.single.start.minute % 15, 0);
     expect(store.savedEvents.single.durationMinutes, greaterThan(60));
     expect(store.savedEvents.single.durationMinutes % 15, 0);
+    _restoreTestPlatform();
   });
 
   testWidgets('drags an event directly with the desktop primary button', (
@@ -269,6 +272,7 @@ void main() {
     expect(moved.start.hour, 9);
     expect(moved.start.minute, 30);
     expect(moved.durationMinutes, original.durationMinutes);
+    _restoreTestPlatform();
   });
 
   testWidgets('Escape cancels a desktop drag-to-create preview', (
@@ -301,6 +305,7 @@ void main() {
     await gesture.up();
     await tester.pumpAndSettle();
     expect(store.savedEvents, isEmpty);
+    _restoreTestPlatform();
   });
 
   testWidgets('right click opens a bounded time adjustment card', (
@@ -337,6 +342,7 @@ void main() {
     await tester.tap(find.byKey(const Key('save-event')));
     await tester.pumpAndSettle();
     expect(store.savedEvents.single.durationMinutes, 75);
+    _restoreTestPlatform();
   });
 
   testWidgets('rapid layout changes settle on the latest requested view', (
@@ -532,7 +538,10 @@ void _useScaledViewport(WidgetTester tester, Size logicalSize, double scale) {
 
 void _useDesktopPlatform() {
   debugDefaultTargetPlatformOverride = TargetPlatform.windows;
-  addTearDown(() => debugDefaultTargetPlatformOverride = null);
+}
+
+void _restoreTestPlatform() {
+  debugDefaultTargetPlatformOverride = null;
 }
 
 class _MemoryEventStore implements CalendarEventStore {
