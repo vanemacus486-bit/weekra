@@ -25,6 +25,33 @@ abstract final class WeekraMetrics {
   static const pageGutter = 24.0;
 }
 
+/// Motion and material values used by the calendar interaction surfaces.
+///
+/// Keeping these values together makes the transitions feel related and gives
+/// reduced-motion users a single, reliable escape hatch.
+abstract final class WeekraMotion {
+  static const quick = Duration(milliseconds: 120);
+  static const control = Duration(milliseconds: 180);
+  static const content = Duration(milliseconds: 220);
+  static const panel = Duration(milliseconds: 190);
+
+  static const standard = Cubic(0.2, 0.72, 0.2, 1);
+  static const emphasized = Cubic(0.16, 0.86, 0.24, 1);
+
+  static Duration resolve(BuildContext context, Duration duration) {
+    return MediaQuery.disableAnimationsOf(context) ? Duration.zero : duration;
+  }
+}
+
+abstract final class WeekraMaterial {
+  static const glass = Color(0xD91D1F22);
+  static const glassStrong = Color(0xF2232529);
+  static const glassBorder = Color(0x24FFFFFF);
+  static const shadow = Color(0x66000000);
+  static const blurSigma = 14.0;
+  static const floatingRadius = 16.0;
+}
+
 abstract final class WeekraDesign {
   static ThemeData dark({String? fontFamily, Color? accent}) {
     final resolvedAccent = accent ?? WeekraColors.coral;
@@ -114,13 +141,9 @@ abstract final class WeekraDesign {
           minimumSize: WidgetStatePropertyAll(
             Size(0, WeekraMetrics.controlHeight),
           ),
-          padding: WidgetStatePropertyAll(
-            EdgeInsets.symmetric(horizontal: 12),
-          ),
+          padding: WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 12)),
           shape: WidgetStatePropertyAll(controlShape),
-          foregroundColor: WidgetStatePropertyAll(
-            WeekraColors.textSecondary,
-          ),
+          foregroundColor: WidgetStatePropertyAll(WeekraColors.textSecondary),
           textStyle: WidgetStatePropertyAll(
             TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
           ),
@@ -156,7 +179,10 @@ abstract final class WeekraDesign {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: WeekraColors.surfaceRaised,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 13,
+        ),
         border: const OutlineInputBorder(
           borderRadius: BorderRadius.all(
             Radius.circular(WeekraMetrics.controlRadius),

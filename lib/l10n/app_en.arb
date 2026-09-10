@@ -5,11 +5,11 @@
   "today": "Today",
   "weekLayoutPickerLabel": "Week layout",
   "weekLayoutHourly": "Hourly",
-  "weekLayoutGrid": "Grid",
+  "weekLayoutGrid": "Overview",
   "previousWeekTooltip": "Previous week",
   "nextWeekTooltip": "Next week",
   "newEventTooltip": "New event",
-  "moveEventHint": "Press and drag to move this event",
+  "moveEventHint": "Drag to move; press and drag on touch",
   "resizeEventStart": "Adjust event start time",
   "resizeEventEnd": "Adjust event end time",
   "confirmNewEventTime": "Confirm the new event time",
@@ -39,6 +39,18 @@
   "locationOptionalLabel": "Location (optional)",
   "daySection": "DAY",
   "timeSection": "TIME",
+  "adjustEventTimeTitle": "Adjust time",
+  "durationSection": "DURATION",
+  "durationMinutes": "{minutes} min",
+  "@durationMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "decreaseDurationTooltip": "Shorten by 15 minutes",
+  "increaseDurationTooltip": "Extend by 15 minutes",
   "colorSection": "COLOR",
   "eventTitleRequired": "Add an event title.",
   "eventEndAfterStart": "End time must be after start time.",
