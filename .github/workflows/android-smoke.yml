@@ -55,7 +55,7 @@ jobs:
             adb shell settings put system accelerometer_rotation 0
             adb shell settings put system user_rotation 0
             adb shell monkey -p com.example.weekra 1
-            sleep 12
+            sleep 25
             adb exec-out screencap -p >android-smoke/01-mobile-overview.png
 
             adb shell input tap 600 465
@@ -64,7 +64,7 @@ jobs:
             adb shell input keyevent KEYCODE_BACK
             sleep 1
 
-            adb shell input tap 720 300
+            adb shell input tap 610 305
             sleep 2
             adb exec-out screencap -p >android-smoke/03-mobile-hourly.png
 
