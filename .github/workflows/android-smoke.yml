@@ -54,20 +54,39 @@ jobs:
             adb shell wm density 420
             adb shell settings put system accelerometer_rotation 0
             adb shell settings put system user_rotation 0
-            adb shell monkey -p com.example.weekra 1
-            sleep 25
+
+            launch_weekra() {
+              adb shell am force-stop com.example.weekra
+              adb shell monkey -p com.example.weekra 1 >/dev/null
+              sleep "$1"
+            }
+
+            # First launch includes shader/JIT warm-up; later scenarios relaunch
+            # independently so a missed tap cannot leave the remaining captures
+            # on the Android launcher.
+            launch_weekra 25
             adb exec-out screencap -p >android-smoke/01-mobile-overview.png
 
-            adb shell input tap 600 465
+            # Open the first Monday event in the agenda overview.
+            adb shell input tap 620 525
             sleep 2
             adb exec-out screencap -p >android-smoke/02-mobile-event-details.png
-            adb shell input keyevent KEYCODE_BACK
-            sleep 1
+            if cmp -s android-smoke/01-mobile-overview.png android-smoke/02-mobile-event-details.png; then
+              echo "Event details did not open" >&2
+              exit 1
+            fi
 
-            adb shell input tap 610 305
+            launch_weekra 4
+            # The switcher's left half is the hourly layout at this density.
+            adb shell input tap 710 355
             sleep 2
             adb exec-out screencap -p >android-smoke/03-mobile-hourly.png
+            if cmp -s android-smoke/01-mobile-overview.png android-smoke/03-mobile-hourly.png; then
+              echo "Hourly layout did not open" >&2
+              exit 1
+            fi
 
+            # Long-press and drag an empty Friday slot to create a live draft.
             adb shell input motionevent DOWN 735 970
             sleep 1
             adb shell input motionevent MOVE 735 1140
