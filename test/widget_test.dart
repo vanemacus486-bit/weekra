@@ -71,6 +71,55 @@ void main() {
     );
   });
 
+  testWidgets('renders dense interaction fixtures in a wide desktop window', (
+    tester,
+  ) async {
+    _useViewport(tester, const Size(1280, 800));
+    await tester.pumpWidget(
+      WeekraApp(
+        eventStore: _MemoryEventStore(_interactionFixtures()),
+        locale: const Locale('en'),
+        enableAutomaticUpdates: false,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('hourly-event-fixture-short')), findsOneWidget);
+    expect(find.byKey(const Key('hourly-event-fixture-long')), findsOneWidget);
+    expect(
+      find.byKey(const Key('hourly-event-fixture-overnight')),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('renders dense interaction fixtures in a narrow desktop window', (
+    tester,
+  ) async {
+    _useViewport(tester, const Size(820, 680));
+    await tester.pumpWidget(
+      WeekraApp(
+        eventStore: _MemoryEventStore(_interactionFixtures()),
+        locale: const Locale('en'),
+        enableAutomaticUpdates: false,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final gridRect = tester.getRect(find.byKey(const Key('week-hourly-grid')));
+    for (final id in [
+      'fixture-overlap-a',
+      'fixture-overlap-b',
+      'fixture-overlap-c',
+      'fixture-overlap-d',
+    ]) {
+      final eventRect = tester.getRect(find.byKey(Key('hourly-event-$id')));
+      expect(eventRect.left, greaterThanOrEqualTo(gridRect.left));
+      expect(eventRect.right, lessThanOrEqualTo(gridRect.right));
+    }
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('keeps all seven columns usable at 125 percent display scale', (
     tester,
   ) async {
@@ -592,4 +641,64 @@ CalendarEvent _eventAtStartOfWeek(String title) {
     end: start.add(const Duration(hours: 10)),
     color: const Color(0xFFFF7B6F),
   );
+}
+
+List<CalendarEvent> _interactionFixtures() {
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  final weekStart = today.subtract(
+    Duration(days: now.weekday - DateTime.monday),
+  );
+
+  DateTime at(int day, int hour, [int minute = 0]) {
+    return weekStart.add(Duration(days: day, hours: hour, minutes: minute));
+  }
+
+  CalendarEvent event(
+    String id,
+    String title,
+    DateTime start,
+    DateTime end,
+    Color color,
+  ) {
+    return CalendarEvent(
+      id: id,
+      title: title,
+      start: start,
+      end: end,
+      color: color,
+    );
+  }
+
+  return [
+    event(
+      'fixture-short',
+      'Short event',
+      at(0, 8),
+      at(0, 8, 15),
+      const Color(0xFFF1776C),
+    ),
+    event(
+      'fixture-long',
+      'A deliberately long event title that must remain bounded and readable',
+      at(1, 13),
+      at(1, 15),
+      const Color(0xFF7F9DD4),
+    ),
+    for (var index = 0; index < 4; index++)
+      event(
+        'fixture-overlap-${String.fromCharCode(97 + index)}',
+        'Overlap ${index + 1}',
+        at(3, 10, index * 15),
+        at(3, 12, index * 15),
+        const Color(0xFF70B8AF),
+      ),
+    event(
+      'fixture-overnight',
+      'Overnight maintenance',
+      at(5, 22, 30),
+      at(6, 1, 30),
+      const Color(0xFFC6A15B),
+    ),
+  ];
 }
