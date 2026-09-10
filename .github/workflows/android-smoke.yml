@@ -55,9 +55,7 @@ jobs:
             adb shell settings put system accelerometer_rotation 0
             adb shell settings put system user_rotation 0
 
-            # First launch includes shader/JIT warm-up; later scenarios relaunch
-            # independently so a missed tap cannot leave the remaining captures
-            # on the Android launcher.
+            # First launch includes shader/JIT warm-up.
             adb shell am force-stop com.example.weekra
             adb shell monkey -p com.example.weekra 1 >/dev/null
             sleep 25
@@ -69,9 +67,9 @@ jobs:
             adb exec-out screencap -p >android-smoke/02-mobile-event-details.png
             if cmp -s android-smoke/01-mobile-overview.png android-smoke/02-mobile-event-details.png; then echo "Event details did not open" >&2; exit 1; fi
 
-            adb shell am force-stop com.example.weekra
-            adb shell monkey -p com.example.weekra 1 >/dev/null
-            sleep 4
+            # Close the details sheet and continue in the already-rendered app.
+            adb shell input keyevent KEYCODE_BACK
+            sleep 1
             # The switcher's left half is the hourly layout at this density.
             adb shell input tap 710 355
             sleep 2
