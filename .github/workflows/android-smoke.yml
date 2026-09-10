@@ -47,7 +47,7 @@ jobs:
           emulator-boot-timeout: 900
           emulator-options: -no-snapshot -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           script: |
-            set -euo pipefail
+            set -eu
             mkdir -p android-smoke
             adb install -r build/app/outputs/flutter-apk/app-debug.apk
             adb shell wm size 1080x2400
