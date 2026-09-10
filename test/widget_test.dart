@@ -90,6 +90,12 @@ void main() {
       find.byKey(const Key('hourly-event-fixture-overnight')),
       findsOneWidget,
     );
+    expect(
+      find.byKey(
+        const Key('hourly-event-fixture-overnight-continuation-6'),
+      ),
+      findsOneWidget,
+    );
     expect(tester.takeException(), isNull);
   });
 
@@ -118,6 +124,41 @@ void main() {
       expect(eventRect.right, lessThanOrEqualTo(gridRect.right));
     }
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('preserves an overnight event through the time adjustment card', (
+    tester,
+  ) async {
+    _useViewport(tester, const Size(1280, 800));
+    _useDesktopPlatform();
+    final overnight = _interactionFixtures().last;
+    final store = _MemoryEventStore([overnight]);
+    await tester.pumpWidget(
+      WeekraApp(
+        eventStore: store,
+        locale: const Locale('en'),
+        enableAutomaticUpdates: false,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(
+      find.byKey(
+        const Key('hourly-event-fixture-overnight-continuation-6'),
+      ),
+      buttons: kSecondaryMouseButton,
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('adjust-time-card')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('save-event')));
+    await tester.pumpAndSettle();
+    expect(store.savedEvents.single.durationMinutes, 180);
+    expect(
+      store.savedEvents.single.end.day,
+      isNot(store.savedEvents.single.start.day),
+    );
+    _restoreTestPlatform();
   });
 
   testWidgets('keeps all seven columns usable at 125 percent display scale', (

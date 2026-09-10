@@ -18,6 +18,7 @@ const _subtleLine = WeekraColors.dividerSubtle;
 const _gridSnapMinutes = 15;
 const _minimumEventMinutes = 15;
 const _defaultEventMinutes = 60;
+const _maximumAdjustMinute = 2 * 24 * 60 - _gridSnapMinutes;
 
 enum _WeekLayout { hourly, grid }
 
@@ -1543,8 +1544,12 @@ class _WeekHourlyLayoutState extends State<_WeekHourlyLayout> {
           final timedEvents = widget.events
               .where((event) => !_isAllDayEvent(event))
               .toList(growable: false);
-          final displayedTimedEvents =
-              timedEvents.map(_displayEvent).toList(growable: false);
+          final displayedTimedEvents = timedEvents
+              .map(_displayEvent)
+              .expand(
+                (event) => _timedEventSegments(event, widget.days.first),
+              )
+              .toList(growable: false);
           final visibleRange = _visibleHourRange(displayedTimedEvents);
           final startHour = visibleRange.$1;
           final endHour = visibleRange.$2;
@@ -1552,7 +1557,7 @@ class _WeekHourlyLayoutState extends State<_WeekHourlyLayout> {
             7,
             (dayIndex) => allDayEvents
                 .where(
-                  (event) => event.dayIndexIn(widget.days.first) == dayIndex,
+                  (event) => _eventOccursOnDay(event, widget.days[dayIndex]),
                 )
                 .length,
           ).fold<int>(0, math.max);
@@ -1713,12 +1718,22 @@ class _WeekHourlyLayoutState extends State<_WeekHourlyLayout> {
                                       widget.events.firstWhere(
                                     (event) => event.id == displayedEvent.id,
                                   );
+                                  final displayedOriginal =
+                                      _displayEvent(originalEvent);
+                                  final isLeadingSegment =
+                                      displayedEvent.start ==
+                                          displayedOriginal.start;
+                                  final segmentDayIndex = displayedEvent
+                                      .dayIndexIn(widget.days.first);
+                                  final segmentKey = isLeadingSegment
+                                      ? 'hourly-event-${originalEvent.id}'
+                                      : 'hourly-event-${originalEvent.id}'
+                                          '-continuation-$segmentDayIndex';
                                   return _GridEvent(
-                                    key: ValueKey(originalEvent.id),
+                                    key: ValueKey(segmentKey),
+                                    eventKey: Key(segmentKey),
                                     event: displayedEvent,
-                                    dayIndex: displayedEvent.dayIndexIn(
-                                      widget.days.first,
-                                    ),
+                                    dayIndex: segmentDayIndex,
                                     lane: placement.lane,
                                     laneCount: placement.laneCount,
                                     columnWidth: columnWidth,
@@ -1732,6 +1747,10 @@ class _WeekHourlyLayoutState extends State<_WeekHourlyLayout> {
                                         _movingEvent?.id == originalEvent.id,
                                     isResizing:
                                         _resizingEvent?.id == originalEvent.id,
+                                    allowResize: _isSameDay(
+                                      displayedOriginal.start,
+                                      displayedOriginal.end,
+                                    ),
                                     desktopPointers: desktopPointers,
                                     onTap: (anchorRect) {
                                       _selectEvent(originalEvent);
@@ -2165,6 +2184,7 @@ class _HourRule extends StatelessWidget {
 class _GridEvent extends StatelessWidget {
   const _GridEvent({
     super.key,
+    required this.eventKey,
     required this.event,
     required this.dayIndex,
     required this.lane,
@@ -2177,6 +2197,7 @@ class _GridEvent extends StatelessWidget {
     required this.isSelected,
     required this.isManipulating,
     required this.isResizing,
+    required this.allowResize,
     required this.desktopPointers,
     required this.onTap,
     required this.onSecondaryTap,
@@ -2190,6 +2211,7 @@ class _GridEvent extends StatelessWidget {
     required this.onResizeCancel,
   });
 
+  final Key eventKey;
   final CalendarEvent event;
   final int dayIndex;
   final int lane;
@@ -2202,6 +2224,7 @@ class _GridEvent extends StatelessWidget {
   final bool isSelected;
   final bool isManipulating;
   final bool isResizing;
+  final bool allowResize;
   final bool desktopPointers;
   final ValueChanged<Rect> onTap;
   final ValueChanged<Rect> onSecondaryTap;
@@ -2221,7 +2244,8 @@ class _GridEvent extends StatelessWidget {
     final top = (visibleStart - startHour * 60) / 60 * hourHeight;
     final rawHeight = (visibleEnd - visibleStart) / 60 * hourHeight;
     final bodyHeight = math.max(28.0, rawHeight - 4);
-    final handlePadding = isSelected && !isManipulating ? 12.0 : 0.0;
+    final showResizeHandles = allowResize && isSelected && !isManipulating;
+    final handlePadding = showResizeHandles ? 12.0 : 0.0;
     final desiredBodyTop = top + 2;
     final positionedTop = math.max(0.0, desiredBodyTop - handlePadding);
     final bodyOffset = desiredBodyTop - positionedTop;
@@ -2276,7 +2300,7 @@ class _GridEvent extends StatelessWidget {
                         ? SystemMouseCursors.move
                         : MouseCursor.defer,
                     child: GestureDetector(
-                      key: Key('hourly-event-${event.id}'),
+                      key: eventKey,
                       behavior: HitTestBehavior.opaque,
                       dragStartBehavior: DragStartBehavior.down,
                       onTapUp: (details) => onTap(
@@ -2480,7 +2504,7 @@ class _GridEvent extends StatelessWidget {
                 ),
               ),
             ),
-          if (isSelected && !isManipulating) ...[
+          if (showResizeHandles) ...[
             _GridResizeHandle(
               key: Key('event-resize-start-${event.id}'),
               edge: _ResizeEdge.start,
@@ -3397,7 +3421,7 @@ class _EventTimeAdjustCardState extends State<_EventTimeAdjustCard> {
     super.initState();
     _startMinute = widget.event.startMinutes.clamp(0, 23 * 60 + 30).toInt();
     _endMinute = (_startMinute + widget.event.durationMinutes)
-        .clamp(_startMinute + _minimumEventMinutes, 23 * 60 + 45)
+        .clamp(_startMinute + _minimumEventMinutes, _maximumAdjustMinute)
         .toInt();
   }
 
@@ -3405,7 +3429,7 @@ class _EventTimeAdjustCardState extends State<_EventTimeAdjustCard> {
     final minute = start ? _startMinute : _endMinute;
     final picked = await showTimePicker(
       context: context,
-      initialTime: _timeOfDayAt(minute),
+      initialTime: _timeOfDayAt(minute % (24 * 60)),
     );
     if (picked == null || !mounted) {
       return;
@@ -3416,11 +3440,20 @@ class _EventTimeAdjustCardState extends State<_EventTimeAdjustCard> {
         final previousDuration = _duration;
         _startMinute = pickedMinute.clamp(0, 23 * 60 + 30).toInt();
         _endMinute = (_startMinute + previousDuration)
-            .clamp(_startMinute + _minimumEventMinutes, 23 * 60 + 45)
+            .clamp(
+              _startMinute + _minimumEventMinutes,
+              _maximumAdjustMinute,
+            )
             .toInt();
       } else {
-        _endMinute = pickedMinute
-            .clamp(_startMinute + _minimumEventMinutes, 23 * 60 + 45)
+        final adjustedMinute = pickedMinute <= _startMinute
+            ? pickedMinute + 24 * 60
+            : pickedMinute;
+        _endMinute = adjustedMinute
+            .clamp(
+              _startMinute + _minimumEventMinutes,
+              _maximumAdjustMinute,
+            )
             .toInt();
       }
     });
@@ -3429,7 +3462,7 @@ class _EventTimeAdjustCardState extends State<_EventTimeAdjustCard> {
   void _changeDuration(int delta) {
     setState(() {
       _endMinute = (_endMinute + delta)
-          .clamp(_startMinute + _minimumEventMinutes, 23 * 60 + 45)
+          .clamp(_startMinute + _minimumEventMinutes, _maximumAdjustMinute)
           .toInt();
     });
     HapticFeedback.selectionClick();
@@ -3492,7 +3525,7 @@ class _EventTimeAdjustCardState extends State<_EventTimeAdjustCard> {
           const SizedBox(height: 8),
           _TimeRangeFields(
             startTime: _timeOfDayAt(_startMinute),
-            endTime: _timeOfDayAt(_endMinute),
+            endTime: _timeOfDayAt(_endMinute % (24 * 60)),
             onStartPressed: () => _pickTime(start: true),
             onEndPressed: () => _pickTime(start: false),
           ),
@@ -3887,6 +3920,33 @@ bool _eventOccursOnDay(CalendarEvent event, DateTime day) {
   final dayStart = DateTime(day.year, day.month, day.day);
   final dayEnd = dayStart.add(const Duration(days: 1));
   return event.start.isBefore(dayEnd) && event.end.isAfter(dayStart);
+}
+
+Iterable<CalendarEvent> _timedEventSegments(
+  CalendarEvent event,
+  DateTime weekStart,
+) sync* {
+  final visibleStart = event.start.isAfter(weekStart) ? event.start : weekStart;
+  final weekEnd = weekStart.add(const Duration(days: 7));
+  final visibleEnd = event.end.isBefore(weekEnd) ? event.end : weekEnd;
+  if (!visibleEnd.isAfter(visibleStart)) {
+    return;
+  }
+
+  var dayStart = DateTime(
+    visibleStart.year,
+    visibleStart.month,
+    visibleStart.day,
+  );
+  while (dayStart.isBefore(visibleEnd)) {
+    final dayEnd = dayStart.add(const Duration(days: 1));
+    final segmentStart = event.start.isAfter(dayStart) ? event.start : dayStart;
+    final segmentEnd = event.end.isBefore(dayEnd) ? event.end : dayEnd;
+    if (segmentEnd.isAfter(segmentStart)) {
+      yield _copyEvent(event, start: segmentStart, end: segmentEnd);
+    }
+    dayStart = dayEnd;
+  }
 }
 
 class _EventPlacement {
