@@ -54,11 +54,15 @@ jobs:
             adb shell wm density 420
             adb shell settings put system accelerometer_rotation 0
             adb shell settings put system user_rotation 0
+            adb shell settings put global hide_error_dialogs 1
+            adb shell settings put secure anr_show_background 0
 
             # First launch includes shader/JIT warm-up.
             adb shell am force-stop com.example.weekra
             adb shell monkey -p com.example.weekra 1 >/dev/null
             sleep 25
+            adb shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS >/dev/null 2>&1 || true
+            sleep 1
             adb exec-out screencap -p >android-smoke/01-mobile-overview.png
 
             # Open the first Monday event in the agenda overview.
