@@ -1,0 +1,96 @@
+name: Windows Test Package
+
+on:
+  push:
+    branches:
+      - feat/week-view-interactions
+    paths:
+      - 'lib/**'
+      - 'pubspec.yaml'
+      - 'l10n.yaml'
+      - 'installer/**'
+      - 'windows/**'
+      - '.github/workflows/windows-test-package.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Read application version
+        id: version
+        shell: pwsh
+        run: |
+          $line = Select-String -Path 'pubspec.yaml' -Pattern '^version:\s*([^+\s]+)'
+          if (-not $line) { throw 'Version is missing from pubspec.yaml.' }
+          $version = $line.Matches[0].Groups[1].Value
+          "version=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Generate Windows runner
+        run: flutter create . --platforms=windows
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Generate localizations
+        run: flutter gen-l10n
+
+      - name: Run tests
+        run: flutter test
+
+      - name: Build Windows release
+        shell: pwsh
+        run: |
+          flutter build windows --release `
+            --dart-define=WEEKRA_VERSION=${{ steps.version.outputs.version }}
+
+      - name: Package portable application
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path 'dist' -Force | Out-Null
+          $release = 'build/windows/x64/runner/Release'
+          Compress-Archive `
+            -Path "$release/*" `
+            -DestinationPath 'dist/weekra-windows-x64.zip' `
+            -Force
+
+      - name: Build installer
+        shell: pwsh
+        run: |
+          & 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe' `
+            "/DMyAppVersion=${{ steps.version.outputs.version }}" `
+            'installer/weekra.iss'
+
+      - name: Write build information
+        shell: pwsh
+        run: |
+          @(
+            "version=${{ steps.version.outputs.version }}"
+            "branch=${{ github.ref_name }}"
+            "commit=${{ github.sha }}"
+            "built_at=$((Get-Date).ToUniversalTime().ToString('o'))"
+          ) | Set-Content -Path 'dist/build-info.txt' -Encoding utf8NoBOM
+
+      - name: Upload test package
+        uses: actions/upload-artifact@v4
+        with:
+          name: weekra-windows-test-${{ steps.version.outputs.version }}
+          path: |
+            dist/weekra-setup-x64.exe
+            dist/weekra-windows-x64.zip
+            dist/build-info.txt
+          if-no-files-found: error
+          retention-days: 14
