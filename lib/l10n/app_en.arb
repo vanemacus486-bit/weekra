@@ -1,15 +1,15 @@
 {
   "@@locale": "en",
   "appTitle": "Weekra",
-  "weekToolbarEyebrow": "WEEKRA / YOUR WEEK",
+  "weekToolbarEyebrow": "W E E K R A",
   "today": "Today",
   "weekLayoutPickerLabel": "Week layout",
   "weekLayoutHourly": "Hourly",
-  "weekLayoutGrid": "Grid",
+  "weekLayoutGrid": "Overview",
   "previousWeekTooltip": "Previous week",
   "nextWeekTooltip": "Next week",
   "newEventTooltip": "New event",
-  "moveEventHint": "Press and drag to move this event",
+  "moveEventHint": "Drag to move; press and drag on touch",
   "resizeEventStart": "Adjust event start time",
   "resizeEventEnd": "Adjust event end time",
   "confirmNewEventTime": "Confirm the new event time",
@@ -37,8 +37,39 @@
   "editEventTitle": "Edit event",
   "titleLabel": "Title",
   "locationOptionalLabel": "Location (optional)",
+  "more": "More",
+  "less": "Less",
+  "categorySection": "Category",
+  "uncategorized": "Uncategorized",
+  "categoryOne": "Category 1",
+  "categoryTwo": "Category 2",
+  "categoryThree": "Category 3",
+  "categoryFour": "Category 4",
+  "categoryFive": "Category 5",
+  "categorySix": "Category 6",
+  "suggestedCategory": "Suggested · {category}",
+  "@suggestedCategory": {
+    "placeholders": {
+      "category": {
+        "type": "String"
+      }
+    }
+  },
   "daySection": "DAY",
   "timeSection": "TIME",
+  "endsNextDayLabel": "Ends next day",
+  "adjustEventTimeTitle": "Adjust time",
+  "durationSection": "DURATION",
+  "durationMinutes": "{minutes} min",
+  "@durationMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "decreaseDurationTooltip": "Shorten by 15 minutes",
+  "increaseDurationTooltip": "Extend by 15 minutes",
   "colorSection": "COLOR",
   "eventTitleRequired": "Add an event title.",
   "eventEndAfterStart": "End time must be after start time.",
@@ -88,5 +119,9 @@
   "themeGraphite": "Graphite",
   "languageSystem": "Follow system",
   "settingsSavedAutomatically": "Changes are saved automatically on this device.",
-  "allDay": "All day"
+  "allDay": "All day",
+  "checkForUpdates": "Check for updates",
+  "updateChecking": "Checking for updates…",
+  "updateUpToDate": "You’re using the latest version.",
+  "updateCheckFailed": "Could not reach the update service. Check your connection and retry in Settings."
 }

@@ -1,0 +1,53 @@
+name: Windows verification
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'lib/**'
+      - 'test/**'
+      - 'pubspec*'
+      - 'installer/**'
+      - '.github/workflows/windows-verify.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v5
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Generate Windows runner
+        run: flutter create . --platforms=windows
+      - name: Resolve and analyze
+        run: |
+          flutter pub get
+          flutter gen-l10n
+          flutter analyze
+      - name: Run tests on Windows
+        run: flutter test --reporter expanded
+      - name: Build Windows application
+        run: flutter build windows --release
+      - name: Package review build
+        shell: pwsh
+        run: |
+          $line = Select-String -Path pubspec.yaml -Pattern '^version:\s*([^+\s]+)'
+          $version = $line.Matches[0].Groups[1].Value
+          New-Item -ItemType Directory -Path dist -Force | Out-Null
+          Compress-Archive -Path 'build/windows/x64/runner/Release/*' -DestinationPath dist/weekra-windows-x64.zip
+          & 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe' "/DMyAppVersion=$version" installer/weekra.iss
+          if ($LASTEXITCODE -ne 0) { throw 'Installer compilation failed.' }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: weekra-windows-review
+          path: |
+            dist/weekra-windows-x64.zip
+            dist/weekra-setup-x64.exe
+          if-no-files-found: error
+          retention-days: 14

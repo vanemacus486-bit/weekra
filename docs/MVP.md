@@ -37,3 +37,16 @@ illustrations, written copy, or other protected brand assets.
 - The user can identify free time in the current week without opening an event.
 - Week navigation and event manipulation remain smooth on the target devices.
 - Core calendar behavior works fully offline.
+
+## Desktop week controls
+
+- Click an empty hourly slot to create a one-hour event, or drag across empty
+  time to choose a range before editing it.
+- Click an event for details. Drag its body to move it, or use the visible top
+  and bottom handles to change its length.
+- Right-click an event to open the nearby time adjustment card for its start,
+  end, and duration.
+- Press Escape to cancel the current draft, move, resize, or floating card.
+
+Touch keeps the existing press-and-drag gesture for moving events and selecting
+a time range.

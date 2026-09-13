@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 
 /// Shared visual language for Weekra's calm, dark calendar surfaces.
 abstract final class WeekraColors {
-  static const canvas = Color(0xFF111214);
-  static const surface = Color(0xFF191B1E);
-  static const surfaceRaised = Color(0xFF202226);
+  static const canvas = Color(0xFF101113);
+  static const surface = Color(0xFF181A1D);
+  static const surfaceRaised = Color(0xFF202327);
   static const surfacePressed = Color(0xFF292C30);
 
   static const textPrimary = Color(0xFFF2EFE9);
@@ -13,33 +13,93 @@ abstract final class WeekraColors {
 
   static const coral = Color(0xFFF1776C);
   static const onAccent = Color(0xFF241311);
-  static const divider = Color(0x17FFFFFF);
-  static const dividerSubtle = Color(0x0CFFFFFF);
+  static const divider = Color(0x14FFFFFF);
+  static const dividerSubtle = Color(0x0AFFFFFF);
   static const outline = Color(0x26FFFFFF);
 }
 
 abstract final class WeekraMetrics {
   static const controlHeight = 38.0;
   static const controlRadius = 10.0;
-  static const eventRadius = 7.0;
-  static const pageGutter = 24.0;
+  static const eventRadius = 9.0;
+  static const pageGutter = 28.0;
+}
+
+/// Motion and material values used by the calendar interaction surfaces.
+///
+/// Keeping these values together makes the transitions feel related and gives
+/// reduced-motion users a single, reliable escape hatch.
+abstract final class WeekraMotion {
+  static const quick = Duration(milliseconds: 120);
+  static const control = Duration(milliseconds: 180);
+  static const content = Duration(milliseconds: 220);
+  static const panel = Duration(milliseconds: 190);
+
+  static const standard = Cubic(0.2, 0.72, 0.2, 1);
+  static const emphasized = Cubic(0.16, 0.86, 0.24, 1);
+
+  static Duration resolve(BuildContext context, Duration duration) {
+    return MediaQuery.disableAnimationsOf(context) ? Duration.zero : duration;
+  }
+}
+
+abstract final class WeekraMaterial {
+  static const glass = Color(0xD91D1F22);
+  static const glassStrong = Color(0xF2232529);
+  static const glassBorder = Color(0x24FFFFFF);
+  static const shadow = Color(0x66000000);
+  static const blurSigma = 14.0;
+  static const floatingRadius = 16.0;
+}
+
+abstract final class WeekraEventStyle {
+  static LinearGradient gradient(Color color, {bool emphasized = false}) =>
+      LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          Color.alphaBlend(
+            color.withValues(alpha: emphasized ? .48 : .36),
+            WeekraColors.surfaceRaised,
+          ),
+          Color.alphaBlend(
+            color.withValues(alpha: emphasized ? .30 : .20),
+            WeekraColors.surface,
+          ),
+        ],
+      );
+
+  static Color surface(Color categoryColor, {bool emphasized = false}) {
+    return Color.alphaBlend(
+      categoryColor.withValues(alpha: emphasized ? 0.38 : 0.28),
+      WeekraColors.surfaceRaised,
+    );
+  }
+
+  static Color subtleSurface(Color categoryColor) {
+    return Color.alphaBlend(
+      categoryColor.withValues(alpha: 0.18),
+      WeekraColors.surfaceRaised,
+    );
+  }
 }
 
 abstract final class WeekraDesign {
   static ThemeData dark({String? fontFamily, Color? accent}) {
     final resolvedAccent = accent ?? WeekraColors.coral;
-    final colorScheme = ColorScheme.fromSeed(
-      seedColor: resolvedAccent,
-      brightness: Brightness.dark,
-      surface: WeekraColors.surface,
-    ).copyWith(
-      primary: resolvedAccent,
-      onPrimary: WeekraColors.onAccent,
-      surface: WeekraColors.surface,
-      onSurface: WeekraColors.textPrimary,
-      outline: WeekraColors.outline,
-      outlineVariant: WeekraColors.divider,
-    );
+    final colorScheme =
+        ColorScheme.fromSeed(
+          seedColor: resolvedAccent,
+          brightness: Brightness.dark,
+          surface: WeekraColors.surface,
+        ).copyWith(
+          primary: resolvedAccent,
+          onPrimary: WeekraColors.onAccent,
+          surface: WeekraColors.surface,
+          onSurface: WeekraColors.textPrimary,
+          outline: WeekraColors.outline,
+          outlineVariant: WeekraColors.divider,
+        );
 
     const controlShape = RoundedRectangleBorder(
       borderRadius: BorderRadius.all(
@@ -110,20 +170,13 @@ abstract final class WeekraDesign {
         ),
       ),
       textButtonTheme: TextButtonThemeData(
-        style: const ButtonStyle(
-          minimumSize: WidgetStatePropertyAll(
-            Size(0, WeekraMetrics.controlHeight),
-          ),
-          padding: WidgetStatePropertyAll(
-            EdgeInsets.symmetric(horizontal: 12),
-          ),
-          shape: WidgetStatePropertyAll(controlShape),
-          foregroundColor: WidgetStatePropertyAll(
-            WeekraColors.textSecondary,
-          ),
-          textStyle: WidgetStatePropertyAll(
-            TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-          ),
+        style: TextButton.styleFrom(
+          minimumSize: const Size(0, WeekraMetrics.controlHeight),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          shape: controlShape,
+          foregroundColor: WeekraColors.textSecondary,
+          textStyle: TextStyle(fontFamily: fontFamily,
+            fontSize: 13, fontWeight: FontWeight.w600),
         ),
       ),
       filledButtonTheme: FilledButtonThemeData(
@@ -156,7 +209,10 @@ abstract final class WeekraDesign {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: WeekraColors.surfaceRaised,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 13,
+        ),
         border: const OutlineInputBorder(
           borderRadius: BorderRadius.all(
             Radius.circular(WeekraMetrics.controlRadius),

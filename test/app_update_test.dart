@@ -1,7 +1,18 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
+import 'package:weekra/app/app_version.dart';
 import 'package:weekra/features/updater/domain/app_update.dart';
 
 void main() {
+  test('runtime version matches the published semantic version', () {
+    final pubspec = File('pubspec.yaml').readAsStringSync();
+    final version = RegExp(
+      r'^version: ([^+\s]+)',
+      multiLine: true,
+    ).firstMatch(pubspec)!.group(1);
+    expect(appVersion, version);
+  });
   test('detects newer semantic versions', () {
     expect(isNewerVersion('0.2.0', '0.1.9'), isTrue);
     expect(isNewerVersion('v1.0.0', '0.9.9'), isTrue);

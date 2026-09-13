@@ -1,17 +1,55 @@
 import 'dart:io';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:weekra/app/weekra_app.dart';
 import 'package:weekra/features/calendar/data/calendar_event_store.dart';
 import 'package:weekra/features/calendar/domain/calendar_event.dart';
+import 'package:weekra/features/calendar/domain/event_category.dart';
 
 const _previewKey = Key('weekra-preview');
 final _fixedNow = DateTime(2026, 9, 9, 10, 32);
 
 void main() {
   setUpAll(_loadPreviewFonts);
+
+  testWidgets('renders the centered settings card', (tester) async {
+    await _pumpPreview(
+      tester,
+      const Size(1280, 800),
+      _previewEvents(crowded: false),
+    );
+    await tester.tap(find.byKey(const Key('open-settings')));
+    await tester.pumpAndSettle();
+    await expectLater(
+      find.byKey(_previewKey),
+      matchesGoldenFile('goldens/desktop-settings-1280x800.png'),
+    );
+  });
+
+  testWidgets('renders glass thumb motion frames', (tester) async {
+    await _pumpPreview(
+      tester,
+      const Size(1280, 800),
+      _previewEvents(crowded: false),
+    );
+    await expectLater(
+      find.byKey(_previewKey),
+      matchesGoldenFile('goldens/motion-0.png'),
+    );
+    await tester.tap(find.byKey(const Key('week-layout-grid')));
+    await tester.pump();
+    for (var frame = 1; frame <= 8; frame++) {
+      await tester.pump(const Duration(milliseconds: 50));
+      await expectLater(
+        find.byKey(_previewKey),
+        matchesGoldenFile('goldens/motion-$frame.png'),
+      );
+    }
+    await tester.pumpAndSettle();
+  });
 
   testWidgets('renders the wide desktop week', (tester) async {
     await _pumpPreview(
@@ -48,6 +86,49 @@ void main() {
     );
   });
 
+  testWidgets('renders the edge-aware desktop time card', (tester) async {
+    await _pumpPreview(
+      tester,
+      const Size(1120, 760),
+      _previewEvents(crowded: true),
+    );
+
+    await tester.tap(
+      find.byKey(const Key('hourly-event-edge-adjust')),
+      buttons: kSecondaryMouseButton,
+    );
+    await tester.pumpAndSettle();
+
+    await expectLater(
+      find.byKey(_previewKey),
+      matchesGoldenFile('goldens/desktop-time-card-edge-1120x760.png'),
+    );
+  });
+
+  testWidgets('renders the compact anchored event editor', (tester) async {
+    await _pumpPreview(
+      tester,
+      const Size(1440, 900),
+      _previewEvents(crowded: true),
+    );
+
+    final grid = find.byKey(const Key('week-hourly-grid'));
+    final gridRect = tester.getRect(grid);
+    await tester.tapAt(
+      Offset(
+        gridRect.left + gridRect.width * 0.7,
+        tester.getRect(find.byKey(const Key('hourly-scroll'))).top + 330,
+      ),
+      kind: PointerDeviceKind.mouse,
+    );
+    await tester.pumpAndSettle();
+
+    await expectLater(
+      find.byKey(_previewKey),
+      matchesGoldenFile('goldens/desktop-create-card-1440x900.png'),
+    );
+  });
+
   testWidgets('renders the mobile agenda', (tester) async {
     await _pumpPreview(
       tester,
@@ -58,6 +139,24 @@ void main() {
     await expectLater(
       find.byKey(_previewKey),
       matchesGoldenFile('goldens/mobile-week.png'),
+    );
+  });
+
+  testWidgets('renders the touch-sized mobile event editor', (tester) async {
+    await _pumpPreview(
+      tester,
+      const Size(430, 932),
+      _previewEvents(crowded: false),
+    );
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyN);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pumpAndSettle();
+
+    await expectLater(
+      find.byKey(_previewKey),
+      matchesGoldenFile('goldens/mobile-create-card-430x932.png'),
     );
   });
 }
@@ -78,7 +177,7 @@ Future<void> _pumpPreview(
       child: WeekraApp(
         eventStore: _PreviewEventStore(events),
         fontFamily: 'WeekraPreview',
-        locale: const Locale('en'),
+        locale: Locale(Platform.environment['WEEKRA_PREVIEW_LOCALE'] ?? 'en'),
         clock: () => _fixedNow,
         enableAutomaticUpdates: false,
       ),
@@ -96,7 +195,8 @@ Future<void> _loadPreviewFonts() async {
   await Future.wait([
     _loadFont(
       'WeekraPreview',
-      '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+      Platform.environment['WEEKRA_PREVIEW_FONT'] ??
+          '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
     ),
     _loadFont(
       'MaterialIcons',
@@ -113,8 +213,7 @@ Future<void> _loadFont(String family, String path) async {
     bytes.offsetInBytes,
     bytes.lengthInBytes,
   );
-  final loader = FontLoader(family)
-    ..addFont(Future<ByteData>.value(byteData));
+  final loader = FontLoader(family)..addFont(Future<ByteData>.value(byteData));
   await loader.load();
 }
 
@@ -191,6 +290,28 @@ List<CalendarEvent> _previewEvents({required bool crowded}) {
       start: at(4, 18),
       end: at(4, 19, 15),
       color: const Color(0xFF72A57C),
+    ),
+    CalendarEvent(
+      id: 'overnight',
+      title: 'Overnight maintenance window',
+      start: at(5, 22, 30),
+      end: at(6, 1, 30),
+      color: const Color(0xFFC6A15B),
+    ),
+    CalendarEvent(
+      id: 'edge-adjust',
+      title: 'Sunday planning review',
+      start: at(6, 18),
+      end: at(6, 19),
+      color: const Color(0xFF7F9DD4),
+    ),
+    CalendarEvent(
+      id: 'uncategorized',
+      title: 'Unsorted idea with no assigned category',
+      start: at(6, 12, 15),
+      end: at(6, 13),
+      categoryId: EventCategories.uncategorizedId,
+      color: EventCategories.uncategorized.color,
     ),
   ];
 

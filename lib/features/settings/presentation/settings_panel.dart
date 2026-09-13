@@ -1,48 +1,157 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:weekra/app/weekra_design.dart';
+import 'package:weekra/app/app_version.dart';
 import 'package:weekra/app/weekra_theme.dart';
 import 'package:weekra/features/settings/domain/app_settings.dart';
 import 'package:weekra/l10n/app_localizations.dart';
 
 class SettingsPanel extends StatelessWidget {
-  const SettingsPanel({super.key, required this.settings, required this.onChanged, required this.onClose});
+  const SettingsPanel({
+    super.key,
+    required this.settings,
+    required this.onChanged,
+    required this.onClose,
+    this.onCheckUpdates,
+    this.updateStatus,
+  });
 
   final AppSettings settings;
   final ValueChanged<AppSettings> onChanged;
   final VoidCallback onClose;
+  final Future<void> Function()? onCheckUpdates;
+  final ValueListenable<String?>? updateStatus;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     return Material(
-      color: WeekraColors.surface,
+      color: Colors.transparent,
       child: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(28, 22, 24, 28),
           child: ListView(
+            key: const Key('settings-card'),
+            shrinkWrap: true,
             children: [
-              Row(children: [
-                Expanded(child: Text(l10n.settingsTitle, style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w500, letterSpacing: -1))),
-                IconButton(tooltip: l10n.closeTooltip, onPressed: onClose, icon: const Icon(Icons.close_rounded)),
-              ]),
-              const SizedBox(height: 30),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      l10n.settingsTitle,
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w500,
+                        letterSpacing: -1,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: l10n.closeTooltip,
+                    onPressed: onClose,
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
               _SectionLabel(l10n.settingsAppearance),
               const SizedBox(height: 14),
-              Row(children: [
-                _ThemeChoice(label: l10n.themeEmber, value: WeekraTheme.ember, selected: settings.theme, onTap: _setTheme),
-                const SizedBox(width: 10),
-                _ThemeChoice(label: l10n.themeLagoon, value: WeekraTheme.lagoon, selected: settings.theme, onTap: _setTheme),
-                const SizedBox(width: 10),
-                _ThemeChoice(label: l10n.themeGraphite, value: WeekraTheme.graphite, selected: settings.theme, onTap: _setTheme),
-              ]),
-              const SizedBox(height: 34),
+              Row(
+                children: [
+                  _ThemeChoice(
+                    label: l10n.themeEmber,
+                    value: WeekraTheme.ember,
+                    selected: settings.theme,
+                    onTap: _setTheme,
+                  ),
+                  const SizedBox(width: 10),
+                  _ThemeChoice(
+                    label: l10n.themeLagoon,
+                    value: WeekraTheme.lagoon,
+                    selected: settings.theme,
+                    onTap: _setTheme,
+                  ),
+                  const SizedBox(width: 10),
+                  _ThemeChoice(
+                    label: l10n.themeGraphite,
+                    value: WeekraTheme.graphite,
+                    selected: settings.theme,
+                    onTap: _setTheme,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
               _SectionLabel(l10n.settingsLanguage),
               const SizedBox(height: 10),
-              _LanguageChoice(label: l10n.languageSystem, value: WeekraLanguage.system, settings: settings, onChanged: _setLanguage),
-              _LanguageChoice(label: 'English', value: WeekraLanguage.english, settings: settings, onChanged: _setLanguage),
-              _LanguageChoice(label: '简体中文', value: WeekraLanguage.chinese, settings: settings, onChanged: _setLanguage),
-              const SizedBox(height: 28),
-              Text(l10n.settingsSavedAutomatically, style: const TextStyle(color: WeekraColors.textSecondary, fontSize: 13)),
+              _LanguageChoice(
+                label: l10n.languageSystem,
+                value: WeekraLanguage.system,
+                settings: settings,
+                onChanged: _setLanguage,
+              ),
+              _LanguageChoice(
+                label: 'English',
+                value: WeekraLanguage.english,
+                settings: settings,
+                onChanged: _setLanguage,
+              ),
+              _LanguageChoice(
+                label: '简体中文',
+                value: WeekraLanguage.chinese,
+                settings: settings,
+                onChanged: _setLanguage,
+              ),
+              const SizedBox(height: 20),
+              const Divider(),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Weekra $appVersion',
+                      style: const TextStyle(
+                        color: WeekraColors.textSecondary,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                  if (onCheckUpdates != null)
+                    Flexible(
+                      child: TextButton(
+                        key: const Key('check-for-updates'),
+                        onPressed: onCheckUpdates,
+                        child: Text(
+                          l10n.checkForUpdates,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              if (updateStatus != null)
+                ValueListenableBuilder<String?>(
+                  valueListenable: updateStatus!,
+                  builder: (context, message, _) => message == null
+                      ? const SizedBox.shrink()
+                      : Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Text(
+                            message,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: WeekraColors.textSecondary,
+                            ),
+                          ),
+                        ),
+                ),
+              const SizedBox(height: 16),
+              Text(
+                l10n.settingsSavedAutomatically,
+                style: const TextStyle(
+                  color: WeekraColors.textSecondary,
+                  fontSize: 13,
+                ),
+              ),
             ],
           ),
         ),
@@ -50,33 +159,102 @@ class SettingsPanel extends StatelessWidget {
     );
   }
 
-  void _setTheme(WeekraTheme value) => onChanged(settings.copyWith(theme: value));
-  void _setLanguage(WeekraLanguage value) => onChanged(settings.copyWith(language: value));
+  void _setTheme(WeekraTheme value) =>
+      onChanged(settings.copyWith(theme: value));
+  void _setLanguage(WeekraLanguage value) =>
+      onChanged(settings.copyWith(language: value));
 }
 
 class _SectionLabel extends StatelessWidget {
-  const _SectionLabel(this.label); final String label;
-  @override Widget build(BuildContext context) => Text(label.toUpperCase(), style: const TextStyle(color: WeekraColors.textSecondary, fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 1.7));
+  const _SectionLabel(this.label);
+  final String label;
+  @override
+  Widget build(BuildContext context) => Text(
+    label.toUpperCase(),
+    style: const TextStyle(
+      color: WeekraColors.textSecondary,
+      fontSize: 11,
+      fontWeight: FontWeight.w700,
+      letterSpacing: 1.7,
+    ),
+  );
 }
 
 class _ThemeChoice extends StatelessWidget {
-  const _ThemeChoice({required this.label, required this.value, required this.selected, required this.onTap});
-  final String label; final WeekraTheme value; final WeekraTheme selected; final ValueChanged<WeekraTheme> onTap;
-  @override Widget build(BuildContext context) {
+  const _ThemeChoice({
+    required this.label,
+    required this.value,
+    required this.selected,
+    required this.onTap,
+  });
+  final String label;
+  final WeekraTheme value;
+  final WeekraTheme selected;
+  final ValueChanged<WeekraTheme> onTap;
+  @override
+  Widget build(BuildContext context) {
     final active = value == selected;
-    return Expanded(child: InkWell(onTap: () => onTap(value), borderRadius: BorderRadius.circular(18), child: AnimatedContainer(
-      duration: const Duration(milliseconds: 180), padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(color: active ? WeekraColors.surfaceRaised : Colors.transparent, borderRadius: BorderRadius.circular(18), border: Border.all(color: active ? value.accent : WeekraColors.outline)),
-      child: Column(children: [Container(height: 54, decoration: BoxDecoration(color: value.background.first, borderRadius: BorderRadius.circular(12))), const SizedBox(height: 9), Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: active ? WeekraColors.textPrimary : WeekraColors.textSecondary, fontSize: 12))]),
-    )));
+    return Expanded(
+      child: InkWell(
+        onTap: () => onTap(value),
+        borderRadius: BorderRadius.circular(18),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: active ? WeekraColors.surfaceRaised : Colors.transparent,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: active ? value.accent : WeekraColors.outline,
+            ),
+          ),
+          child: Column(
+            children: [
+              Container(
+                height: 54,
+                decoration: BoxDecoration(
+                  color: value.background.first,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              const SizedBox(height: 9),
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: active
+                      ? WeekraColors.textPrimary
+                      : WeekraColors.textSecondary,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 
 class _LanguageChoice extends StatelessWidget {
-  const _LanguageChoice({required this.label, required this.value, required this.settings, required this.onChanged});
-  final String label; final WeekraLanguage value; final AppSettings settings; final ValueChanged<WeekraLanguage> onChanged;
-  @override Widget build(BuildContext context) => ListTile(
-    contentPadding: EdgeInsets.zero, title: Text(label), onTap: () => onChanged(value),
-    trailing: value == settings.language ? Icon(Icons.check_rounded, color: settings.theme.accent) : null,
+  const _LanguageChoice({
+    required this.label,
+    required this.value,
+    required this.settings,
+    required this.onChanged,
+  });
+  final String label;
+  final WeekraLanguage value;
+  final AppSettings settings;
+  final ValueChanged<WeekraLanguage> onChanged;
+  @override
+  Widget build(BuildContext context) => ListTile(
+    contentPadding: EdgeInsets.zero,
+    title: Text(label),
+    onTap: () => onChanged(value),
+    trailing: value == settings.language
+        ? Icon(Icons.check_rounded, color: settings.theme.accent)
+        : null,
   );
 }

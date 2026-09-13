@@ -1,0 +1,117 @@
+name: Desktop smoke screenshots
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'lib/**'
+      - 'tool/desktop_smoke_main.dart'
+      - '.github/workflows/desktop-smoke.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  desktop-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install Linux desktop dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev xvfb openbox xdotool scrot
+
+      - name: Build Linux desktop app
+        run: |
+          flutter config --enable-linux-desktop
+          flutter pub get
+          flutter gen-l10n
+          flutter create --platforms=linux --project-name weekra .
+          flutter build linux --release --target tool/desktop_smoke_main.dart
+
+      - name: Launch, interact, and capture
+        shell: bash
+        run: |
+          set -euo pipefail
+          export DISPLAY=:99
+          mkdir -p desktop-smoke
+          Xvfb :99 -screen 0 1440x900x24 >desktop-smoke/xvfb.log 2>&1 &
+          sleep 1
+          openbox >desktop-smoke/openbox.log 2>&1 &
+          sleep 1
+          ./build/linux/x64/release/bundle/weekra >desktop-smoke/weekra.log 2>&1 &
+          app_pid=$!
+          trap 'kill "$app_pid" 2>/dev/null || true' EXIT
+
+          window_id=''
+          for attempt in $(seq 1 30); do
+            window_id=$(xdotool search --onlyvisible --name '[Ww]eekra' 2>/dev/null | head -n 1 || true)
+            if [[ -n "$window_id" ]]; then
+              break
+            fi
+            sleep 1
+          done
+          if [[ -z "$window_id" ]]; then
+            cat desktop-smoke/weekra.log
+            exit 1
+          fi
+
+          xdotool windowactivate --sync "$window_id"
+          xdotool windowmove --sync "$window_id" 40 40
+          xdotool windowsize --sync "$window_id" 1280 800
+          sleep 2
+          scrot -o -u desktop-smoke/01-hourly-wide.png
+
+          xdotool mousemove --window "$window_id" 1115 35 click 1
+          sleep 1
+          scrot -o -u desktop-smoke/02-overview-wide.png
+
+          xdotool mousemove --window "$window_id" 1015 35 click 1
+          sleep 0.08
+          xdotool mousemove --window "$window_id" 1115 35 click 1
+          sleep 0.08
+          xdotool mousemove --window "$window_id" 1015 35 click 1
+          sleep 1
+
+          xdotool mousemove --window "$window_id" 1190 700 click 3
+          sleep 1
+          scrot -o -u desktop-smoke/03-time-adjust-card.png
+          xdotool key Escape
+          sleep 0.4
+
+          xdotool windowsize --sync "$window_id" 900 700
+          sleep 1
+          scrot -o -u desktop-smoke/04-hourly-narrow.png
+
+          xdotool windowsize --sync "$window_id" 1280 800
+          sleep 0.5
+          xdotool mousemove --window "$window_id" 835 300 mousedown 1
+          xdotool mousemove --sync --window "$window_id" 835 390
+          xdotool mouseup 1
+          sleep 1
+          scrot -o -u desktop-smoke/05-create-event-card.png
+
+          test -s desktop-smoke/01-hourly-wide.png
+          test -s desktop-smoke/02-overview-wide.png
+          test -s desktop-smoke/03-time-adjust-card.png
+          test -s desktop-smoke/04-hourly-narrow.png
+          test -s desktop-smoke/05-create-event-card.png
+
+      - name: Upload screenshots and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: weekra-desktop-smoke
+          path: desktop-smoke
+          if-no-files-found: error
+          retention-days: 14
