@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:weekra/features/calendar/domain/event_category.dart';
 
 class CalendarEvent {
   CalendarEvent({
@@ -6,16 +7,29 @@ class CalendarEvent {
     required this.title,
     required this.start,
     required this.end,
-    required this.color,
+    required Color color,
+    String? categoryId,
     this.location,
-  }) : assert(end.isAfter(start), 'Event end must be after its start.');
+  }) : categoryId =
+           EventCategories.byId(categoryId)?.id ??
+           EventCategories.idForLegacyColor(color),
+       _legacyColor = color,
+       assert(end.isAfter(start), 'Event end must be after its start.');
 
   final String id;
   final String title;
   final DateTime start;
   final DateTime end;
-  final Color color;
+  final String categoryId;
+  final Color _legacyColor;
   final String? location;
+
+  Color get color => EventCategories.colorFor(
+    categoryId,
+    legacyColor: categoryId == EventCategories.uncategorizedId
+        ? _legacyColor
+        : null,
+  );
 
   int get startMinutes => start.hour * 60 + start.minute;
 
@@ -35,6 +49,9 @@ class CalendarEvent {
       'title': title,
       'start': start.toIso8601String(),
       'end': end.toIso8601String(),
+      'categoryId': categoryId,
+      // Kept as a downgrade-safe display fallback. Category identity and
+      // future statistics use categoryId, never this color value.
       'color': color.toARGB32(),
       'location': location,
     };
@@ -46,7 +63,11 @@ class CalendarEvent {
       title: json['title']! as String,
       start: DateTime.parse(json['start']! as String),
       end: DateTime.parse(json['end']! as String),
-      color: Color(json['color']! as int),
+      color: Color(
+        (json['color'] as int?) ??
+            EventCategories.uncategorized.color.toARGB32(),
+      ),
+      categoryId: json['categoryId'] as String?,
       location: json['location'] as String?,
     );
   }

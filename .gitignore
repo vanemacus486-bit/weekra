@@ -21,3 +21,7 @@ macos/Flutter/ephemeral/
 # OS
 .DS_Store
 Thumbs.db
+
+# Generated localization sources and preview captures
+lib/l10n/app_localizations*.dart
+tool/goldens/

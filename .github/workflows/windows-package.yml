@@ -15,8 +15,13 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: windows-release
+  cancel-in-progress: false
+
 jobs:
   build-and-publish:
+    if: github.ref == 'refs/heads/main'
     runs-on: windows-latest
     timeout-minutes: 25
 
@@ -32,6 +37,26 @@ jobs:
           if (-not $line) { throw 'Version is missing from pubspec.yaml.' }
           $version = $line.Matches[0].Groups[1].Value
           "version=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Require a new release version
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        shell: pwsh
+        run: |
+          $releases = gh api 'repos/${{ github.repository }}/releases' | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot verify release versions.' }
+          if ($releases | Where-Object { $_.tag_name -eq "v$env:VERSION" }) {
+            throw "Version $env:VERSION already exists. Increase pubspec.yaml and app_version.dart; never replace an existing update."
+          }
+          foreach ($release in $releases) {
+            if (-not $release.prerelease -and -not $release.draft) {
+              $published = $release.tag_name.TrimStart('v')
+              if ([version]$published -ge [version]$env:VERSION) {
+                throw 'The new version must exceed every stable release.'
+              }
+            }
+          }
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
@@ -109,19 +134,13 @@ jobs:
         shell: pwsh
         run: |
           $tag = "v$env:VERSION"
-          if (gh release view $tag --repo '${{ github.repository }}' 2>$null) {
-            gh release upload $tag `
-              'dist/weekra-setup-x64.exe' `
-              'dist/weekra-windows-x64.zip' `
-              'dist/update.json' `
-              --clobber `
-              --repo '${{ github.repository }}'
-          } else {
-            gh release create $tag `
-              'dist/weekra-setup-x64.exe' `
-              'dist/weekra-windows-x64.zip' `
-              'dist/update.json' `
-              --title "Weekra $env:VERSION" `
-              --generate-notes `
-              --repo '${{ github.repository }}'
-          }
+          gh release create $tag `
+            'dist/weekra-setup-x64.exe' `
+            'dist/weekra-windows-x64.zip' `
+            'dist/update.json' `
+            --target '${{ github.sha }}' `
+            --title "Weekra $env:VERSION" `
+            --generate-notes `
+            --latest `
+            --repo '${{ github.repository }}'
+          if ($LASTEXITCODE -ne 0) { throw 'Release publication failed.' }

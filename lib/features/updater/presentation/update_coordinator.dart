@@ -16,11 +16,46 @@ class UpdateCoordinator extends StatefulWidget {
   final UpdateService? updateService;
 
   @override
-  State<UpdateCoordinator> createState() => _UpdateCoordinatorState();
+  State<UpdateCoordinator> createState() => UpdateCoordinatorState();
 }
 
-class _UpdateCoordinatorState extends State<UpdateCoordinator> {
+class UpdateCoordinatorState extends State<UpdateCoordinator>
+    with WidgetsBindingObserver {
   bool _started = false;
+  bool _checking = false;
+  Timer? _retryTimer;
+  DateTime? _lastCheck;
+  final status = ValueNotifier<String?>(null);
+  bool get canCheck => widget.updateService != null;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    if (canCheck) {
+      _retryTimer = Timer.periodic(const Duration(hours: 6), (_) {
+        unawaited(checkForUpdates());
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _retryTimer?.cancel();
+    status.dispose();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed &&
+        (_lastCheck == null ||
+            DateTime.now().difference(_lastCheck!) >
+                const Duration(minutes: 10))) {
+      unawaited(checkForUpdates());
+    }
+  }
 
   @override
   void didChangeDependencies() {
@@ -37,15 +72,35 @@ class _UpdateCoordinatorState extends State<UpdateCoordinator> {
     if (!mounted) {
       return;
     }
+    await checkForUpdates();
+  }
+
+  Future<void> checkForUpdates({bool userInitiated = false}) async {
+    if (!mounted || !canCheck || _checking) return;
+    _checking = true;
+    _lastCheck = DateTime.now();
+    final l10n = AppLocalizations.of(context);
+    if (userInitiated) _notice(l10n.updateChecking);
     try {
       final update = await widget.updateService!.checkForUpdate();
-      if (update != null && mounted) {
+      if (!mounted) return;
+      if (update != null) {
         await _offerUpdate(update);
+      } else if (userInitiated) {
+        _notice(l10n.updateUpToDate);
       }
     } on Object {
-      // Update failures must never prevent the calendar from opening. The app
-      // checks again on the next launch.
+      if (mounted) _notice(l10n.updateCheckFailed);
+    } finally {
+      _checking = false;
     }
+  }
+
+  void _notice(String message) {
+    status.value = message;
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _offerUpdate(AppUpdate update) async {
@@ -106,9 +161,7 @@ class _UpdateCoordinatorState extends State<UpdateCoordinator> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
-                    value.$2
-                        ? l10n.updateInstalling
-                        : l10n.updateDownloading,
+                    value.$2 ? l10n.updateInstalling : l10n.updateDownloading,
                     softWrap: true,
                     overflow: TextOverflow.visible,
                   ),

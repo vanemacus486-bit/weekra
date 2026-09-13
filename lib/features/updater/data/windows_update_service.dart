@@ -2,23 +2,23 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:crypto/crypto.dart';
+import 'package:weekra/app/app_version.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:weekra/features/updater/domain/app_update.dart';
 import 'package:weekra/features/updater/domain/update_service.dart';
 
 const _currentVersion = String.fromEnvironment(
   'WEEKRA_VERSION',
-  defaultValue: '0.2.0',
+  defaultValue: appVersion,
 );
 const _manifestUrl = String.fromEnvironment(
   'WEEKRA_UPDATE_MANIFEST_URL',
-  defaultValue:
-      'https://github.com/vanemacus486-bit/weekra/releases/latest/download/update.json',
+  defaultValue: 'https://github.com/vanemacus486-bit/weekra/releases/latest/download/update.json',
 );
 
 class WindowsUpdateService implements UpdateService {
   WindowsUpdateService({HttpClient? httpClient})
-      : _httpClient = httpClient ?? HttpClient();
+    : _httpClient = httpClient ?? HttpClient();
 
   final HttpClient _httpClient;
 
@@ -26,13 +26,10 @@ class WindowsUpdateService implements UpdateService {
   Future<AppUpdate?> checkForUpdate() async {
     final manifestUri = Uri.parse(_manifestUrl);
     _requireHttps(manifestUri);
-    final request = await _httpClient.getUrl(manifestUri).timeout(
-      const Duration(seconds: 12),
-    );
-    request.headers.set(
-      HttpHeaders.userAgentHeader,
-      'Weekra/$_currentVersion',
-    );
+    final request = await _httpClient
+        .getUrl(manifestUri)
+        .timeout(const Duration(seconds: 12));
+    request.headers.set(HttpHeaders.userAgentHeader, 'Weekra/$_currentVersion');
     final response = await request.close().timeout(const Duration(seconds: 12));
     if (response.statusCode != HttpStatus.ok) {
       await response.drain<void>();
@@ -41,7 +38,10 @@ class WindowsUpdateService implements UpdateService {
         uri: manifestUri,
       );
     }
-    final body = await utf8.decoder.bind(response).join();
+    final body = await utf8.decoder
+        .bind(response)
+        .join()
+        .timeout(const Duration(seconds: 20));
     final manifest = jsonDecode(body);
     if (manifest is! Map<String, dynamic>) {
       throw const FormatException('Update manifest must be an object.');
@@ -111,13 +111,10 @@ class WindowsUpdateService implements UpdateService {
     File destination,
     UpdateProgressCallback? onProgress,
   ) async {
-    final request = await _httpClient.getUrl(uri).timeout(
-      const Duration(seconds: 15),
-    );
-    request.headers.set(
-      HttpHeaders.userAgentHeader,
-      'Weekra/$_currentVersion',
-    );
+    final request = await _httpClient
+        .getUrl(uri)
+        .timeout(const Duration(seconds: 15));
+    request.headers.set(HttpHeaders.userAgentHeader, 'Weekra/$_currentVersion');
     final response = await request.close().timeout(const Duration(seconds: 15));
     if (response.statusCode != HttpStatus.ok) {
       await response.drain<void>();
@@ -131,7 +128,7 @@ class WindowsUpdateService implements UpdateService {
     var received = 0;
     final total = response.contentLength;
     try {
-      await for (final chunk in response) {
+      await for (final chunk in response.timeout(const Duration(seconds: 30))) {
         sink.add(chunk);
         received += chunk.length;
         onProgress?.call(total > 0 ? received / total : null);
@@ -150,7 +147,8 @@ class WindowsUpdateService implements UpdateService {
     final stagingDirectory = '${workDirectory.path}\\payload';
     final logPath = '${workDirectory.path}\\update.log';
     final script = File('${workDirectory.path}\\install-update.ps1');
-    final scriptContents = '''
+    final scriptContents =
+        '''
 \$ErrorActionPreference = 'Stop'
 \$archive = '${_powerShellLiteral(archive.path)}'
 \$staging = '${_powerShellLiteral(stagingDirectory)}'
@@ -175,20 +173,16 @@ try {
 }
 ''';
     await script.writeAsString(scriptContents, flush: true);
-    await Process.start(
-      'powershell.exe',
-      [
-        '-NoProfile',
-        '-NonInteractive',
-        '-ExecutionPolicy',
-        'Bypass',
-        '-WindowStyle',
-        'Hidden',
-        '-File',
-        script.path,
-      ],
-      mode: ProcessStartMode.detached,
-    );
+    await Process.start('powershell.exe', [
+      '-NoProfile',
+      '-NonInteractive',
+      '-ExecutionPolicy',
+      'Bypass',
+      '-WindowStyle',
+      'Hidden',
+      '-File',
+      script.path,
+    ], mode: ProcessStartMode.detached);
     exit(0);
   }
 

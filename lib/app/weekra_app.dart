@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:weekra/app/weekra_design.dart';
+import 'package:weekra/app/glass_surface.dart';
 import 'package:weekra/app/weekra_theme.dart';
 import 'package:weekra/features/calendar/data/calendar_event_store.dart';
 import 'package:weekra/features/calendar/presentation/week_screen.dart';
@@ -60,28 +61,26 @@ class _WeekraAppState extends State<WeekraApp> {
   }
 
   void _openSettings(BuildContext context) {
-    final wide = MediaQuery.sizeOf(context).width >= 760;
-    if (wide) {
-      showGeneralDialog<void>(
-        context: context,
-        barrierDismissible: true,
-        barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
-        barrierColor: Colors.black54,
-        transitionDuration: const Duration(milliseconds: 260),
-        pageBuilder: (dialogContext, _, _) => Align(
-          alignment: AlignmentDirectional.centerEnd,
-          child: SizedBox(width: 430, height: double.infinity, child: SettingsPanel(settings: _settings, onChanged: _changeSettings, onClose: () => Navigator.pop(dialogContext))),
+    final updater = context.findAncestorStateOfType<UpdateCoordinatorState>();
+    showGlassDialog<void>(
+      context,
+      maxWidth: 480,
+      maxHeight: 610,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setPanelState) => SettingsPanel(
+          settings: _settings,
+          updateStatus: updater?.status,
+          onChanged: (settings) {
+            _changeSettings(settings);
+            setPanelState(() {});
+          },
+          onCheckUpdates: updater?.canCheck == true
+              ? () => updater!.checkForUpdates(userInitiated: true)
+              : null,
+          onClose: () => Navigator.pop(dialogContext),
         ),
-        transitionBuilder: (_, animation, _, child) => SlideTransition(position: Tween(begin: const Offset(1, 0), end: Offset.zero).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic)), child: child),
-      );
-    } else {
-      showModalBottomSheet<void>(
-        context: context,
-        isScrollControlled: true,
-        backgroundColor: Colors.transparent,
-        builder: (sheetContext) => FractionallySizedBox(heightFactor: .82, child: ClipRRect(borderRadius: const BorderRadius.vertical(top: Radius.circular(28)), child: SettingsPanel(settings: _settings, onChanged: _changeSettings, onClose: () => Navigator.pop(sheetContext)))),
-      );
-    }
+      ),
+    );
   }
 
   @override
@@ -100,13 +99,11 @@ class _WeekraAppState extends State<WeekraApp> {
       builder: widget.textScaler == null
           ? null
           : (context, child) => MediaQuery(
-              data: MediaQuery.of(context).copyWith(textScaler: widget.textScaler),
+              data: MediaQuery.of(context)
+                  .copyWith(textScaler: widget.textScaler),
               child: child!,
             ),
-      theme: WeekraDesign.dark(
-        fontFamily: widget.fontFamily,
-        accent: accent,
-      ),
+      theme: WeekraDesign.dark(fontFamily: widget.fontFamily, accent: accent),
       home: UpdateCoordinator(
         updateService: widget.enableAutomaticUpdates
             ? widget.updateService ?? _defaultUpdateService()

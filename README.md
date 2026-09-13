@@ -34,7 +34,7 @@ The installer places the production app in the current user's local Programs
 folder, adds Start menu integration, and optionally creates a desktop shortcut.
 Flutter is not required on the user's computer.
 
-Weekra checks for updates shortly after launch. When a newer version is
+Weekra checks for updates shortly after launch, every six hours, and when resumed. Settings shows the installed version and provides a manual check with visible connection errors. When a newer version is
 available, it downloads the portable release, verifies its SHA-256 digest,
 installs it, and restarts automatically after the user confirms. Calendar data
 stays in the user's documents directory during updates.
@@ -44,7 +44,7 @@ release. Extract the complete folder before opening `weekra.exe`.
 
 ## Publish a Windows update
 
-1. Increase `version` in `pubspec.yaml`.
+1. Increase `version` in `pubspec.yaml` and `appVersion` in `lib/app/app_version.dart`. Existing release versions cannot be reused.
 2. Push the change to `main`, or run the `Windows Release` workflow manually.
 3. Wait for the workflow to test, build, package, and publish the GitHub Release.
 
@@ -60,17 +60,17 @@ The first UI slice is in place:
 
 - Timepage-inspired Grid summary and seven-column Hourly layouts
 - Hourly / Grid switching on phones, tablets, and desktops
-- Narrow-screen hourly density with adaptive event and time ranges
+- Full 00:00–24:00 timeline with a scrollable initial daytime viewport
 - Current-day and current-time emphasis
 - Previous/next week navigation, including horizontal swipe
 - Responsive event blocks backed by a small domain model
 - Timepage-style direct manipulation in Hourly view: select or drag to create,
   press and drag to move, and pull either event edge to resize
-- Working event form with date, time, location, and color
+- Compact glass event editor with date, time, category, and optional location
 - Offline JSON persistence in the app documents directory
 - Event detail, editing, and confirmed deletion flows
 - System-driven English and Simplified Chinese UI
-- Timepage-inspired settings page with instant theme and language changes
+- Centered glass settings card with instant theme/language changes and update status
 - Pseudo-localization plus small-screen and large-type layout tests
 
 Direct event manipulation uses 15-minute snapping, tactile feedback, live
@@ -90,7 +90,13 @@ flutter test
 See [docs/I18N.md](docs/I18N.md) for the UI contract every new screen must
 follow.
 
+The legacy six-color event format is documented in
+[docs/CATEGORIES.md](docs/CATEGORIES.md), including its stable-ID migration and
+the category names that still need product confirmation.
+
 ## Design reference
 
 Timepage is used as a product and interaction reference. Weekra will use its
 own brand, visual assets, copy, and implementation.
+
+See [the glass and update correction notes](docs/GLASS_AND_UPDATES.md) for references, platform limits and validation scope.
