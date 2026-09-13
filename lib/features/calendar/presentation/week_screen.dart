@@ -677,7 +677,12 @@ class _WeekLayoutSwitcher extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final width = showLabels ? 204.0 : 88.0;
+    const labelStyle = TextStyle(fontSize: 12, fontWeight: FontWeight.w700);
+    final labelWidth = math.max(
+      _singleLineTextWidth(context, l10n.weekLayoutHourly, labelStyle),
+      _singleLineTextWidth(context, l10n.weekLayoutGrid, labelStyle),
+    );
+    final width = showLabels ? math.max(204.0, labelWidth * 2 + 108) : 88.0;
     return Semantics(
       container: true,
       label: l10n.weekLayoutPickerLabel,
@@ -3140,8 +3145,7 @@ class _EventEditorSheetState extends State<_EventEditorSheet> {
                   const Divider(height: 1, color: _line),
                   const SizedBox(height: 8),
                   _CompactDateTimeFields(
-                    dateLabel:
-                        '${_weekdayShortName(l10n, _selectedDate.weekday)} · ${materialL10n.formatMediumDate(_selectedDate)}',
+                    dateLabel: materialL10n.formatMediumDate(_selectedDate),
                     startLabel: materialL10n.formatTimeOfDay(
                       _startTime,
                       alwaysUse24HourFormat: MediaQuery.alwaysUse24HourFormatOf(
