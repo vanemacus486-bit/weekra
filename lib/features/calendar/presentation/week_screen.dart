@@ -2038,7 +2038,7 @@ class _FlowingDateSwitcher extends StatelessWidget {
         fit: StackFit.expand,
         children: [
           ...previousChildren,
-          currentChild?,
+          ?currentChild,
         ],
       ),
       transitionBuilder: (transitionChild, animation) {
