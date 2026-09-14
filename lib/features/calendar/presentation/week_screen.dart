@@ -62,6 +62,7 @@ class WeekScreen extends StatefulWidget {
 
 class _WeekScreenState extends State<WeekScreen> {
   late DateTime _weekStart;
+  int _navigationDirection = 0;
   _WeekLayout _layout = _WeekLayout.grid;
   List<CalendarEvent> _events = [];
   bool _isLoading = true;
@@ -72,7 +73,7 @@ class _WeekScreenState extends State<WeekScreen> {
   @override
   void initState() {
     super.initState();
-    _weekStart = _startOfWeek(_now());
+    _weekStart = _centeredTimelineStart(_now());
   }
 
   @override
@@ -233,15 +234,24 @@ class _WeekScreenState extends State<WeekScreen> {
     }
   }
 
-  void _moveWeek(int offset) {
+  void _moveTimeline(int offset) {
+    if (offset == 0) {
+      return;
+    }
     setState(() {
-      _weekStart = _weekStart.add(Duration(days: offset * 7));
+      _navigationDirection = offset.sign;
+      _weekStart = _weekStart.add(Duration(days: offset));
     });
   }
 
   void _returnToToday() {
+    final target = _centeredTimelineStart(_now());
+    if (_isSameDay(target, _weekStart)) {
+      return;
+    }
     setState(() {
-      _weekStart = _startOfWeek(_now());
+      _navigationDirection = target.isAfter(_weekStart) ? 1 : -1;
+      _weekStart = target;
     });
   }
 
@@ -261,8 +271,8 @@ class _WeekScreenState extends State<WeekScreen> {
       (index) => _weekStart.add(Duration(days: index)),
     );
     final events = _events.where((event) {
-      final dayIndex = event.dayIndexIn(_weekStart);
-      return dayIndex >= 0 && dayIndex < 7;
+      final visibleEnd = _weekStart.add(const Duration(days: 7));
+      return event.end.isAfter(_weekStart) && event.start.isBefore(visibleEnd);
     }).toList();
 
     return CallbackShortcuts(
@@ -271,6 +281,14 @@ class _WeekScreenState extends State<WeekScreen> {
             _createEvent(),
         const SingleActivator(LogicalKeyboardKey.keyN, meta: true): () =>
             _createEvent(),
+        const SingleActivator(LogicalKeyboardKey.arrowLeft): () =>
+            _moveTimeline(-1),
+        const SingleActivator(LogicalKeyboardKey.arrowRight): () =>
+            _moveTimeline(1),
+        const SingleActivator(LogicalKeyboardKey.keyK): () =>
+            _moveTimeline(-1),
+        const SingleActivator(LogicalKeyboardKey.keyJ): () => _moveTimeline(1),
+        const SingleActivator(LogicalKeyboardKey.keyT): _returnToToday,
       },
       child: Focus(
         autofocus: true,
@@ -282,8 +300,8 @@ class _WeekScreenState extends State<WeekScreen> {
                 _WeekToolbar(
                   weekStart: _weekStart,
                   layout: _layout,
-                  onPrevious: () => _moveWeek(-1),
-                  onNext: () => _moveWeek(1),
+                  onPrevious: () => _moveTimeline(-1),
+                  onNext: () => _moveTimeline(1),
                   onToday: _returnToToday,
                   onLayoutChanged: _setLayout,
                   onSettings: widget.onOpenSettings,
@@ -305,7 +323,7 @@ class _WeekScreenState extends State<WeekScreen> {
                                   if (velocity.abs() < 350) {
                                     return;
                                   }
-                                  _moveWeek(velocity < 0 ? 1 : -1);
+                                  _moveTimeline(velocity < 0 ? 1 : -1);
                                 },
                           child: _WeekLayoutStage(
                             layout: _layout,
@@ -314,6 +332,7 @@ class _WeekScreenState extends State<WeekScreen> {
                               days: days,
                               events: events,
                               now: now,
+                              navigationDirection: _navigationDirection,
                               onEventTap: _openEvent,
                               onCreateEvent:
                                   ({
@@ -582,12 +601,14 @@ class _WeekNavigation extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           IconButton(
+            key: const Key('timeline-previous-day'),
             onPressed: onPrevious,
             tooltip: l10n.previousWeekTooltip,
             icon: const Icon(Icons.chevron_left_rounded, size: 20),
           ),
           if (compact)
             IconButton(
+              key: const Key('timeline-today'),
               onPressed: onToday,
               tooltip: l10n.today,
               color: accent,
@@ -596,6 +617,7 @@ class _WeekNavigation extends StatelessWidget {
           else
             _TodayButton(onPressed: onToday, label: l10n.today, color: accent),
           IconButton(
+            key: const Key('timeline-next-day'),
             onPressed: onNext,
             tooltip: l10n.nextWeekTooltip,
             icon: const Icon(Icons.chevron_right_rounded, size: 20),
@@ -620,6 +642,7 @@ class _TodayButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Semantics(
+      key: const Key('timeline-today'),
       button: true,
       label: label,
       child: Material(
@@ -1051,6 +1074,7 @@ class _WeekHourlyLayout extends StatefulWidget {
     required this.days,
     required this.events,
     required this.now,
+    required this.navigationDirection,
     required this.onEventTap,
     required this.onCreateEvent,
     required this.onEventChanged,
@@ -1060,6 +1084,7 @@ class _WeekHourlyLayout extends StatefulWidget {
   final List<DateTime> days;
   final List<CalendarEvent> events;
   final DateTime now;
+  final int navigationDirection;
   final _OpenEventCallback onEventTap;
   final _CreateEventCallback onCreateEvent;
   final ValueChanged<CalendarEvent> onEventChanged;
@@ -1583,14 +1608,30 @@ class _WeekHourlyLayoutState extends State<_WeekHourlyLayout> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     SizedBox(width: gutterWidth),
-                    for (final day in widget.days)
-                      Expanded(
-                        child: _GridDayHeader(
-                          day: day,
-                          isToday: _isSameDay(day, widget.now),
-                          narrow: narrow,
+                    Expanded(
+                      child: ClipRect(
+                        child: _FlowingDateSwitcher(
+                          direction: widget.navigationDirection,
+                          travelDistance: columnWidth,
+                          child: Row(
+                            key: ValueKey(
+                              'hourly-header-${_dateKey(widget.days.first)}',
+                            ),
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              for (final day in widget.days)
+                                Expanded(
+                                  child: _GridDayHeader(
+                                    day: day,
+                                    isToday: _isSameDay(day, widget.now),
+                                    narrow: narrow,
+                                  ),
+                                ),
+                            ],
+                          ),
                         ),
                       ),
+                    ),
                   ],
                 ),
               ),
@@ -1601,6 +1642,7 @@ class _WeekHourlyLayoutState extends State<_WeekHourlyLayout> {
                   events: allDayEvents,
                   today: widget.now,
                   gutterWidth: gutterWidth,
+                  navigationDirection: widget.navigationDirection,
                   onEventTap: widget.onEventTap,
                 ),
               ],
@@ -1684,18 +1726,6 @@ class _WeekHourlyLayoutState extends State<_WeekHourlyLayout> {
                           child: Stack(
                             clipBehavior: Clip.none,
                             children: [
-                              if (todayIndex >= 0)
-                                PositionedDirectional(
-                                  start: gutterWidth + todayIndex * columnWidth,
-                                  top: 0,
-                                  bottom: 0,
-                                  width: columnWidth,
-                                  child: ColoredBox(
-                                    color: WeekraColors.textPrimary.withValues(
-                                      alpha: 0.018,
-                                    ),
-                                  ),
-                                ),
                               for (
                                 var hour = startHour;
                                 hour <= endHour;
@@ -1706,16 +1736,57 @@ class _WeekHourlyLayoutState extends State<_WeekHourlyLayout> {
                                   gutterWidth: gutterWidth,
                                   label: _formatTime(context, hour * 60),
                                 ),
-                              for (var index = 1; index < 7; index++)
-                                PositionedDirectional(
-                                  start: gutterWidth + columnWidth * index,
-                                  top: 0,
-                                  bottom: 0,
-                                  child: const VerticalDivider(
-                                    width: 1,
-                                    color: _subtleLine,
-                                  ),
-                                ),
+                              PositionedDirectional(
+                                start: gutterWidth,
+                                end: 0,
+                                top: 0,
+                                bottom: 0,
+                                child: ClipRect(
+                                  child: _FlowingDateSwitcher(
+                                    direction: widget.navigationDirection,
+                                    travelDistance: columnWidth,
+                                    child: SizedBox.expand(
+                                      key: ValueKey(
+                                        'hourly-canvas-'
+                                        '${_dateKey(widget.days.first)}',
+                                      ),
+                                      child: Stack(
+                                        clipBehavior: Clip.none,
+                                        children: [
+                                          if (todayIndex >= 0)
+                                            PositionedDirectional(
+                                              key: const Key(
+                                                'timeline-today-column',
+                                              ),
+                                              start:
+                                                  todayIndex * columnWidth,
+                                              top: 0,
+                                              bottom: 0,
+                                              width: columnWidth,
+                                              child: DecoratedBox(
+                                                decoration: BoxDecoration(
+                                                  gradient: LinearGradient(
+                                                    begin: Alignment.topCenter,
+                                                    end:
+                                                        Alignment.bottomCenter,
+                                                    colors: [
+                                                      Theme.of(context)
+                                                          .colorScheme
+                                                          .primary
+                                                          .withValues(
+                                                            alpha: 0.045,
+                                                          ),
+                                                      WeekraColors.textPrimary
+                                                          .withValues(
+                                                            alpha: 0.012,
+                                                          ),
+                                                      Colors.transparent,
+                                                    ],
+                                                    stops: const [0, .36, 1],
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
                               for (final placement in _eventPlacements(
                                 displayedTimedEvents,
                               ))
@@ -1747,7 +1818,7 @@ class _WeekHourlyLayoutState extends State<_WeekHourlyLayout> {
                                       lane: placement.lane,
                                       laneCount: placement.laneCount,
                                       columnWidth: columnWidth,
-                                      gutterWidth: gutterWidth,
+                                      gutterWidth: 0,
                                       startHour: startHour,
                                       hourHeight: hourHeight,
                                       narrow: narrow,
@@ -1810,7 +1881,7 @@ class _WeekHourlyLayoutState extends State<_WeekHourlyLayout> {
                                   anchorKey: _draftAnchorKey,
                                   dayIndex: draft.dayIndexIn(widget.days.first),
                                   columnWidth: columnWidth,
-                                  gutterWidth: gutterWidth,
+                                  gutterWidth: 0,
                                   startHour: startHour,
                                   hourHeight: hourHeight,
                                   compact: narrow,
@@ -1839,8 +1910,14 @@ class _WeekHourlyLayoutState extends State<_WeekHourlyLayout> {
                                   startHour: startHour,
                                   endHour: endHour,
                                   hourHeight: hourHeight,
-                                  gutterWidth: gutterWidth,
+                                  gutterWidth: 0,
                                 ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
                             ],
                           ),
                         ),
@@ -1937,6 +2014,66 @@ class _WeekHourlyLayoutState extends State<_WeekHourlyLayout> {
   }
 }
 
+class _FlowingDateSwitcher extends StatelessWidget {
+  const _FlowingDateSwitcher({
+    required this.child,
+    required this.direction,
+    required this.travelDistance,
+  });
+
+  final Widget child;
+  final int direction;
+  final double travelDistance;
+
+  @override
+  Widget build(BuildContext context) {
+    final resolvedDirection = direction == 0 ? 1 : direction.sign;
+    final duration = WeekraMotion.resolve(context, WeekraMotion.control);
+    return AnimatedSwitcher(
+      duration: duration,
+      reverseDuration: duration,
+      switchInCurve: WeekraMotion.emphasized,
+      switchOutCurve: WeekraMotion.standard,
+      layoutBuilder: (currentChild, previousChildren) => Stack(
+        fit: StackFit.expand,
+        children: [
+          ...previousChildren,
+          if (currentChild != null) currentChild,
+        ],
+      ),
+      transitionBuilder: (transitionChild, animation) {
+        final incoming = transitionChild.key == child.key;
+        return AnimatedBuilder(
+          animation: animation,
+          child: IgnorePointer(
+            ignoring: !incoming,
+            child: ExcludeSemantics(
+              excluding: !incoming,
+              child: transitionChild,
+            ),
+          ),
+          builder: (context, transitionChild) {
+            final remaining = 1 - animation.value;
+            final offset =
+                remaining *
+                travelDistance *
+                resolvedDirection *
+                (incoming ? 1 : -1);
+            return Opacity(
+              opacity: .42 + animation.value * .58,
+              child: Transform.translate(
+                offset: Offset(offset, 0),
+                child: transitionChild,
+              ),
+            );
+          },
+        );
+      },
+      child: child,
+    );
+  }
+}
+
 class _GridDayHeader extends StatelessWidget {
   const _GridDayHeader({
     required this.day,
@@ -2008,6 +2145,7 @@ class _AllDayBand extends StatelessWidget {
     required this.events,
     required this.today,
     required this.gutterWidth,
+    required this.navigationDirection,
     required this.onEventTap,
   });
 
@@ -2015,13 +2153,14 @@ class _AllDayBand extends StatelessWidget {
   final List<CalendarEvent> events;
   final DateTime today;
   final double gutterWidth;
+  final int navigationDirection;
   final _OpenEventCallback onEventTap;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final byDay = List.generate(
-      7,
+      days.length,
       (index) => events
           .where((event) => _eventOccursOnDay(event, days[index]))
           .toList(),
@@ -2059,31 +2198,57 @@ class _AllDayBand extends StatelessWidget {
               ),
             ),
           ),
-          for (var dayIndex = 0; dayIndex < 7; dayIndex++)
-            Expanded(
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 5),
-                color: _isSameDay(days[dayIndex], today)
-                    ? WeekraColors.textPrimary.withValues(alpha: 0.018)
-                    : Colors.transparent,
-                child: Column(
-                  children: [
-                    for (
-                      var index = 0;
-                      index < byDay[dayIndex].length;
-                      index++
-                    ) ...[
-                      _AllDayEvent(
-                        event: byDay[dayIndex][index],
-                        onTap: onEventTap,
-                      ),
-                      if (index != byDay[dayIndex].length - 1)
-                        const SizedBox(height: 3),
+          Expanded(
+            child: ClipRect(
+              child: LayoutBuilder(
+                builder: (context, constraints) => _FlowingDateSwitcher(
+                  direction: navigationDirection,
+                  travelDistance: constraints.maxWidth / days.length,
+                  child: Row(
+                    key: ValueKey('all-day-${_dateKey(days.first)}'),
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      for (
+                        var dayIndex = 0;
+                        dayIndex < days.length;
+                        dayIndex++
+                      )
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 3,
+                              vertical: 5,
+                            ),
+                            color: _isSameDay(days[dayIndex], today)
+                                ? WeekraColors.textPrimary.withValues(
+                                    alpha: 0.018,
+                                  )
+                                : Colors.transparent,
+                            child: Column(
+                              children: [
+                                for (
+                                  var index = 0;
+                                  index < byDay[dayIndex].length;
+                                  index++
+                                ) ...[
+                                  _AllDayEvent(
+                                    event: byDay[dayIndex][index],
+                                    onTap: onEventTap,
+                                  ),
+                                  if (index !=
+                                      byDay[dayIndex].length - 1)
+                                    const SizedBox(height: 3),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ),
                     ],
-                  ],
+                  ),
                 ),
               ),
             ),
+          ),
         ],
       ),
     );
@@ -2192,7 +2357,7 @@ class _HourRule extends StatelessWidget {
               ),
             ),
           ),
-          const Expanded(child: Divider(height: 1, color: _line)),
+          const Expanded(child: Divider(height: 1, color: _subtleLine)),
         ],
       ),
     );
@@ -4275,10 +4440,12 @@ const _fieldLabelStyle = TextStyle(
   letterSpacing: 1.3,
 );
 
-DateTime _startOfWeek(DateTime date) {
+DateTime _centeredTimelineStart(DateTime date) {
   final day = DateTime(date.year, date.month, date.day);
-  return day.subtract(Duration(days: day.weekday - DateTime.monday));
+  return day.subtract(const Duration(days: 3));
 }
+
+int _dateKey(DateTime date) => date.year * 10000 + date.month * 100 + date.day;
 
 bool _isSameDay(DateTime a, DateTime b) {
   return a.year == b.year && a.month == b.month && a.day == b.day;
