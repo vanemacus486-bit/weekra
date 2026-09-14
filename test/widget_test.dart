@@ -66,6 +66,48 @@ void main() {
     );
   });
 
+  testWidgets('rapid timeline changes retarget without cross-fading', (
+    tester,
+  ) async {
+    _useViewport(tester, const Size(1280, 800));
+    final now = DateTime(2026, 9, 14, 13, 30);
+    await tester.pumpWidget(
+      WeekraApp(
+        eventStore: _MemoryEventStore(),
+        locale: const Locale('en'),
+        enableAutomaticUpdates: false,
+        clock: () => now,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('timeline-next-day')));
+    await tester.pump(const Duration(milliseconds: 70));
+    final incoming = find.byKey(
+      const ValueKey('hourly-header-20260912'),
+    );
+    expect(
+      find.byKey(const ValueKey('hourly-header-20260911')),
+      findsOneWidget,
+    );
+    expect(incoming, findsOneWidget);
+    expect(
+      find.ancestor(of: incoming, matching: find.byType(Opacity)),
+      findsNothing,
+    );
+
+    await tester.tap(find.byKey(const Key('timeline-next-day')));
+    await tester.pump(const Duration(milliseconds: 70));
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyK);
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('hourly-header-20260912')),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('can create in both ends of the full day', (tester) async {
     _useViewport(tester, const Size(1280, 800));
     _useDesktopPlatform();

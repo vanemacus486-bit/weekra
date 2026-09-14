@@ -2014,7 +2014,7 @@ class _WeekHourlyLayoutState extends State<_WeekHourlyLayout> {
   }
 }
 
-class _FlowingDateSwitcher extends StatelessWidget {
+class _FlowingDateSwitcher extends StatefulWidget {
   const _FlowingDateSwitcher({
     required this.child,
     required this.direction,
@@ -2026,50 +2026,125 @@ class _FlowingDateSwitcher extends StatelessWidget {
   final double travelDistance;
 
   @override
+  State<_FlowingDateSwitcher> createState() =>
+      _FlowingDateSwitcherState();
+}
+
+class _FlowingDateSwitcherState extends State<_FlowingDateSwitcher>
+    with SingleTickerProviderStateMixin {
+  static const _flowCurve = Cubic(.2, .8, .2, 1);
+
+  late final AnimationController _controller;
+  late Widget _currentChild;
+  Widget? _outgoingChild;
+  double _incomingBeginOffset = 0;
+  double _outgoingBeginOffset = 0;
+  double _outgoingEndOffset = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentChild = widget.child;
+    _controller = AnimationController(vsync: this, value: 1)
+      ..addStatusListener(_handleAnimationStatus);
+  }
+
+  @override
+  void didUpdateWidget(covariant _FlowingDateSwitcher oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.child.key == widget.child.key) {
+      _currentChild = widget.child;
+      return;
+    }
+
+    final progress = _flowCurve.transform(_controller.value);
+    final currentOffset = _incomingBeginOffset * (1 - progress);
+    final direction = widget.direction == 0 ? 1 : widget.direction.sign;
+    final distance = widget.travelDistance;
+
+    _outgoingChild = _currentChild;
+    _outgoingBeginOffset = currentOffset;
+    _outgoingEndOffset = -direction * distance;
+    _incomingBeginOffset = currentOffset + direction * distance;
+    _currentChild = widget.child;
+
+    final baseDuration = WeekraMotion.resolve(
+      context,
+      const Duration(milliseconds: 290),
+    );
+    if (baseDuration == Duration.zero || distance == 0) {
+      _controller.stop();
+      _controller.value = 1;
+      _outgoingChild = null;
+      _incomingBeginOffset = 0;
+      return;
+    }
+
+    final distanceFactor = (_incomingBeginOffset.abs() / distance)
+        .clamp(.45, 2.2);
+    _controller.duration = Duration(
+      microseconds: (baseDuration.inMicroseconds * distanceFactor).round(),
+    );
+    _controller.forward(from: 0);
+  }
+
+  void _handleAnimationStatus(AnimationStatus status) {
+    if (status != AnimationStatus.completed ||
+        _outgoingChild == null ||
+        !mounted) {
+      return;
+    }
+    setState(() {
+      _outgoingChild = null;
+      _incomingBeginOffset = 0;
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller
+      ..removeStatusListener(_handleAnimationStatus)
+      ..dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final resolvedDirection = direction == 0 ? 1 : direction.sign;
-    final duration = WeekraMotion.resolve(context, WeekraMotion.control);
-    return AnimatedSwitcher(
-      duration: duration,
-      reverseDuration: duration,
-      switchInCurve: WeekraMotion.emphasized,
-      switchOutCurve: WeekraMotion.standard,
-      layoutBuilder: (currentChild, previousChildren) => Stack(
-        fit: StackFit.expand,
-        children: [
-          ...previousChildren,
-          ?currentChild,
-        ],
-      ),
-      transitionBuilder: (transitionChild, animation) {
-        final incoming = transitionChild.key == child.key;
-        return AnimatedBuilder(
-          animation: animation,
-          child: IgnorePointer(
-            ignoring: !incoming,
-            child: ExcludeSemantics(
-              excluding: !incoming,
-              child: transitionChild,
-            ),
-          ),
-          builder: (context, transitionChild) {
-            final remaining = 1 - animation.value;
-            final offset =
-                remaining *
-                travelDistance *
-                resolvedDirection *
-                (incoming ? 1 : -1);
-            return Opacity(
-              opacity: .42 + animation.value * .58,
-              child: Transform.translate(
-                offset: Offset(offset, 0),
-                child: transitionChild,
+    final outgoingChild = _outgoingChild;
+    if (outgoingChild == null) {
+      return RepaintBoundary(child: _currentChild);
+    }
+
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        final progress = _flowCurve.transform(_controller.value);
+        final outgoingOffset =
+            _outgoingBeginOffset +
+            (_outgoingEndOffset - _outgoingBeginOffset) * progress;
+        final incomingOffset = _incomingBeginOffset * (1 - progress);
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            IgnorePointer(
+              child: ExcludeSemantics(
+                child: RepaintBoundary(
+                  child: Transform.translate(
+                    offset: Offset(outgoingOffset, 0),
+                    child: outgoingChild,
+                  ),
+                ),
               ),
-            );
-          },
+            ),
+            RepaintBoundary(
+              child: Transform.translate(
+                offset: Offset(incomingOffset, 0),
+                child: _currentChild,
+              ),
+            ),
+          ],
         );
       },
-      child: child,
     );
   }
 }
