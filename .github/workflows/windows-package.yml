@@ -39,25 +39,34 @@ jobs:
           "version=$version" >> $env:GITHUB_OUTPUT
 
       - name: Require a new release version
+        id: version_guard
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.version.outputs.version }}
+          REPAIR_TARGET: e43196899d099d080192c42df1ffe0a65ca371dc
         shell: pwsh
         run: |
           $releases = gh api 'repos/${{ github.repository }}/releases' | ConvertFrom-Json
           if ($LASTEXITCODE -ne 0) { throw 'Cannot verify release versions.' }
-          if ($releases | Where-Object { $_.tag_name -eq "v$env:VERSION" }) {
-            throw "Version $env:VERSION already exists. Increase pubspec.yaml and app_version.dart; never replace an existing update."
-          }
-          foreach ($release in $releases) {
-            if (-not $release.prerelease -and -not $release.draft) {
-              $published = $release.tag_name.TrimStart('v')
-              if ([version]$published -ge [version]$env:VERSION) {
-                throw 'The new version must exceed every stable release.'
+          $existing = $releases | Where-Object { $_.tag_name -eq "v$env:VERSION" } | Select-Object -First 1
+          if ($existing) {
+            if ($env:VERSION -eq '0.5.5' -and $existing.target_commitish -eq $env:REPAIR_TARGET) {
+              "replace_release=true" >> $env:GITHUB_OUTPUT
+              Write-Host 'Repairing the just-published 0.5.5 compatibility manifest once.'
+            } else {
+              throw "Version $env:VERSION already exists. Increase pubspec.yaml and app_version.dart; never replace an existing update."
+            }
+          } else {
+            "replace_release=false" >> $env:GITHUB_OUTPUT
+            foreach ($release in $releases) {
+              if (-not $release.prerelease -and -not $release.draft) {
+                $published = $release.tag_name.TrimStart('v')
+                if ([version]$published -ge [version]$env:VERSION) {
+                  throw 'The new version must exceed every stable release.'
+                }
               }
             }
           }
-
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -103,13 +112,17 @@ jobs:
         shell: pwsh
         run: |
           $version = '${{ steps.version.outputs.version }}'
+          $archive = 'dist/weekra-windows-x64.zip'
           $installer = 'dist/weekra-setup-x64.exe'
-          $sha256 = (Get-FileHash -Algorithm SHA256 $installer).Hash.ToLowerInvariant()
+          $archiveSha256 = (Get-FileHash -Algorithm SHA256 $archive).Hash.ToLowerInvariant()
+          $installerSha256 = (Get-FileHash -Algorithm SHA256 $installer).Hash.ToLowerInvariant()
           $manifest = [ordered]@{
             version = $version
             windows = [ordered]@{
-              url = "https://github.com/${{ github.repository }}/releases/download/v$version/weekra-setup-x64.exe"
-              sha256 = $sha256
+              url = "https://github.com/${{ github.repository }}/releases/download/v$version/weekra-windows-x64.zip"
+              sha256 = $archiveSha256
+              installerUrl = "https://github.com/${{ github.repository }}/releases/download/v$version/weekra-setup-x64.exe"
+              installerSha256 = $installerSha256
             }
           }
           $manifest | ConvertTo-Json -Depth 3 | Set-Content `
@@ -134,13 +147,27 @@ jobs:
         shell: pwsh
         run: |
           $tag = "v$env:VERSION"
-          gh release create $tag `
-            'dist/weekra-setup-x64.exe' `
-            'dist/weekra-windows-x64.zip' `
-            'dist/update.json' `
-            --target '${{ github.sha }}' `
-            --title "Weekra $env:VERSION" `
-            --generate-notes `
-            --latest `
-            --repo '${{ github.repository }}'
+          $assets = @(
+            'dist/weekra-setup-x64.exe'
+            'dist/weekra-windows-x64.zip'
+            'dist/update.json'
+          )
+          if ('${{ steps.version_guard.outputs.replace_release }}' -eq 'true') {
+            gh release upload $tag $assets `
+              --clobber `
+              --repo '${{ github.repository }}'
+            if ($LASTEXITCODE -ne 0) { throw 'Release asset repair failed.' }
+            gh release edit $tag `
+              --target '${{ github.sha }}' `
+              --title "Weekra $env:VERSION" `
+              --latest `
+              --repo '${{ github.repository }}'
+          } else {
+            gh release create $tag $assets `
+              --target '${{ github.sha }}' `
+              --title "Weekra $env:VERSION" `
+              --generate-notes `
+              --latest `
+              --repo '${{ github.repository }}'
+          }
           if ($LASTEXITCODE -ne 0) { throw 'Release publication failed.' }
