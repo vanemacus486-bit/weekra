@@ -103,12 +103,12 @@ jobs:
         shell: pwsh
         run: |
           $version = '${{ steps.version.outputs.version }}'
-          $archive = 'dist/weekra-windows-x64.zip'
-          $sha256 = (Get-FileHash -Algorithm SHA256 $archive).Hash.ToLowerInvariant()
+          $installer = 'dist/weekra-setup-x64.exe'
+          $sha256 = (Get-FileHash -Algorithm SHA256 $installer).Hash.ToLowerInvariant()
           $manifest = [ordered]@{
             version = $version
             windows = [ordered]@{
-              url = "https://github.com/${{ github.repository }}/releases/download/v$version/weekra-windows-x64.zip"
+              url = "https://github.com/${{ github.repository }}/releases/download/v$version/weekra-setup-x64.exe"
               sha256 = $sha256
             }
           }

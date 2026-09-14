@@ -123,5 +123,11 @@
   "checkForUpdates": "Check for updates",
   "updateChecking": "Checking for updates…",
   "updateUpToDate": "You’re using the latest version.",
-  "updateCheckFailed": "Could not reach the update service. Check your connection and retry in Settings."
+  "updateCheckFailed": "Could not reach the update service. Check your connection and retry in Settings.",
+  "settingsAppearanceDescription": "Choose a theme that fits your rhythm.",
+  "settingsLanguageDescription": "Choose the language Weekra uses.",
+  "settingsAbout": "About",
+  "settingsAboutDescription": "View the version and keep Weekra up to date.",
+  "settingsVersion": "Version",
+  "settingsUpdateDescription": "Download a verified installer, update safely, and restart."
 }

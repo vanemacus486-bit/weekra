@@ -95,5 +95,11 @@
   "checkForUpdates": "检查更新",
   "updateChecking": "正在检查更新…",
   "updateUpToDate": "当前已是最新版本。",
-  "updateCheckFailed": "无法连接更新服务，请检查网络后在设置中重试。"
+  "updateCheckFailed": "无法连接更新服务，请检查网络后在设置中重试。",
+  "settingsAppearanceDescription": "选择符合你节奏的主题色彩。",
+  "settingsLanguageDescription": "设置 Weekra 使用的显示语言。",
+  "settingsAbout": "关于",
+  "settingsAboutDescription": "查看版本并保持 Weekra 为最新状态。",
+  "settingsVersion": "版本",
+  "settingsUpdateDescription": "下载经过校验的安装程序，安全完成更新并重新启动。"
 }

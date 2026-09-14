@@ -64,8 +64,8 @@ class _WeekraAppState extends State<WeekraApp> {
     final updater = context.findAncestorStateOfType<UpdateCoordinatorState>();
     showGlassDialog<void>(
       context,
-      maxWidth: 480,
-      maxHeight: 610,
+      maxWidth: 900,
+      maxHeight: 680,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setPanelState) => SettingsPanel(
           settings: _settings,
