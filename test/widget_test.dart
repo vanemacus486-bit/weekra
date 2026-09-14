@@ -1014,7 +1014,7 @@ CalendarEvent _event(
 CalendarEvent _eventAtStartOfWeek(String title) {
   final now = DateTime.now();
   final today = DateTime(now.year, now.month, now.day);
-  final start = today.subtract(Duration(days: now.weekday - DateTime.monday));
+  final start = today.subtract(const Duration(days: 3));
   return CalendarEvent(
     id: title,
     title: title,
@@ -1027,9 +1027,7 @@ CalendarEvent _eventAtStartOfWeek(String title) {
 List<CalendarEvent> _interactionFixtures() {
   final now = DateTime.now();
   final today = DateTime(now.year, now.month, now.day);
-  final weekStart = today.subtract(
-    Duration(days: now.weekday - DateTime.monday),
-  );
+  final weekStart = today.subtract(const Duration(days: 3));
 
   DateTime at(int day, int hour, [int minute = 0]) {
     return weekStart.add(Duration(days: day, hours: hour, minutes: minute));
