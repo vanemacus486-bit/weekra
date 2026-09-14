@@ -9,6 +9,63 @@ import 'package:weekra/features/calendar/domain/calendar_event.dart';
 import 'package:weekra/features/calendar/domain/event_category.dart';
 
 void main() {
+  testWidgets('centers today and flows the visible dates one day at a time', (
+    tester,
+  ) async {
+    _useViewport(tester, const Size(1280, 800));
+    final now = DateTime(2026, 9, 14, 13, 30);
+    await tester.pumpWidget(
+      WeekraApp(
+        eventStore: _MemoryEventStore(),
+        locale: const Locale('en'),
+        enableAutomaticUpdates: false,
+        clock: () => now,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('hourly-header-20260911')),
+      findsOneWidget,
+    );
+    final grid = tester.getRect(find.byKey(const Key('week-hourly-grid')));
+    final today = tester.getRect(
+      find.byKey(const Key('timeline-today-column')),
+    );
+    final gutterWidth = grid.width - today.width * 7;
+    expect(
+      today.center.dx,
+      closeTo(grid.left + gutterWidth + today.width * 3.5, .1),
+    );
+
+    await tester.tap(find.byKey(const Key('timeline-next-day')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('hourly-header-20260912')),
+      findsOneWidget,
+    );
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyT);
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('hourly-header-20260911')),
+      findsOneWidget,
+    );
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('hourly-header-20260912')),
+      findsOneWidget,
+    );
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyK);
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('hourly-header-20260911')),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('can create in both ends of the full day', (tester) async {
     _useViewport(tester, const Size(1280, 800));
     _useDesktopPlatform();
@@ -957,7 +1014,7 @@ CalendarEvent _event(
 CalendarEvent _eventAtStartOfWeek(String title) {
   final now = DateTime.now();
   final today = DateTime(now.year, now.month, now.day);
-  final start = today.subtract(Duration(days: now.weekday - DateTime.monday));
+  final start = today.subtract(const Duration(days: 3));
   return CalendarEvent(
     id: title,
     title: title,
@@ -970,9 +1027,7 @@ CalendarEvent _eventAtStartOfWeek(String title) {
 List<CalendarEvent> _interactionFixtures() {
   final now = DateTime.now();
   final today = DateTime(now.year, now.month, now.day);
-  final weekStart = today.subtract(
-    Duration(days: now.weekday - DateTime.monday),
-  );
+  final weekStart = today.subtract(const Duration(days: 3));
 
   DateTime at(int day, int hour, [int minute = 0]) {
     return weekStart.add(Duration(days: day, hours: hour, minutes: minute));
