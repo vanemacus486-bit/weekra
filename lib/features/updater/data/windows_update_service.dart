@@ -2,8 +2,8 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:crypto/crypto.dart';
-import 'package:weekra/app/app_version.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:weekra/app/app_version.dart';
 import 'package:weekra/features/updater/domain/app_update.dart';
 import 'package:weekra/features/updater/domain/update_service.dart';
 
@@ -13,7 +13,8 @@ const _currentVersion = String.fromEnvironment(
 );
 const _manifestUrl = String.fromEnvironment(
   'WEEKRA_UPDATE_MANIFEST_URL',
-  defaultValue: 'https://github.com/vanemacus486-bit/weekra/releases/latest/download/update.json',
+  defaultValue:
+      'https://github.com/vanemacus486-bit/weekra/releases/latest/download/update.json',
 );
 
 class WindowsUpdateService implements UpdateService {
@@ -86,18 +87,20 @@ class WindowsUpdateService implements UpdateService {
     final workDirectory = await Directory(
       '${temporaryDirectory.path}\\weekra-update-${DateTime.now().millisecondsSinceEpoch}',
     ).create(recursive: true);
-    final archive = File('${workDirectory.path}\\weekra-update.zip');
+    final installer = File(
+      '${workDirectory.path}\\weekra-setup-x64.exe',
+    );
 
     try {
-      await _download(update.downloadUri, archive, onProgress);
-      final actualHash = await sha256.bind(archive.openRead()).first;
+      await _download(update.downloadUri, installer, onProgress);
+      final actualHash = await sha256.bind(installer.openRead()).first;
       if (actualHash.toString() != update.sha256) {
         throw const FormatException(
           'The downloaded update failed verification.',
         );
       }
       onProgress?.call(1);
-      await _launchInstallerScript(workDirectory, archive);
+      await _launchInstallerScript(workDirectory, installer);
     } on Object {
       if (await workDirectory.exists()) {
         await workDirectory.delete(recursive: true);
@@ -140,34 +143,36 @@ class WindowsUpdateService implements UpdateService {
 
   Future<void> _launchInstallerScript(
     Directory workDirectory,
-    File archive,
+    File installer,
   ) async {
     final executable = File(Platform.resolvedExecutable);
     final installDirectory = executable.parent.path;
-    final stagingDirectory = '${workDirectory.path}\\payload';
     final logPath = '${workDirectory.path}\\update.log';
     final script = File('${workDirectory.path}\\install-update.ps1');
     // PowerShell's case-insensitive $PID variable identifies PowerShell itself.
-    // Give the Weekra process a distinct variable so the installer can outlive it.
+    // Keep the Weekra process ID separate so the helper can safely outlive it.
     final scriptContents = buildWindowsInstallerScript(
-      archivePath: archive.path,
-      stagingDirectory: stagingDirectory,
+      installerPath: installer.path,
       installDirectory: installDirectory,
       executablePath: executable.path,
       logPath: logPath,
       appProcessId: pid,
     );
     await script.writeAsString(scriptContents, flush: true);
-    await Process.start('powershell.exe', [
-      '-NoProfile',
-      '-NonInteractive',
-      '-ExecutionPolicy',
-      'Bypass',
-      '-WindowStyle',
-      'Hidden',
-      '-File',
-      script.path,
-    ], mode: ProcessStartMode.detached);
+    await Process.start(
+      'powershell.exe',
+      [
+        '-NoProfile',
+        '-NonInteractive',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-WindowStyle',
+        'Hidden',
+        '-File',
+        script.path,
+      ],
+      mode: ProcessStartMode.detached,
+    );
     exit(0);
   }
 
@@ -179,8 +184,7 @@ class WindowsUpdateService implements UpdateService {
 }
 
 String buildWindowsInstallerScript({
-  required String archivePath,
-  required String stagingDirectory,
+  required String installerPath,
   required String installDirectory,
   required String executablePath,
   required String logPath,
@@ -190,8 +194,7 @@ String buildWindowsInstallerScript({
 
   return '''
 \$ErrorActionPreference = 'Stop'
-\$archive = '${literal(archivePath)}'
-\$staging = '${literal(stagingDirectory)}'
+\$installer = '${literal(installerPath)}'
 \$install = '${literal(installDirectory)}'
 \$executable = '${literal(executablePath)}'
 \$log = '${literal(logPath)}'
@@ -199,18 +202,26 @@ String buildWindowsInstallerScript({
 
 try {
   Wait-Process -Id \$appPid -ErrorAction SilentlyContinue
-  if (Test-Path -LiteralPath \$staging) {
-    Remove-Item -LiteralPath \$staging -Recurse -Force
+  \$arguments = @(
+    '/VERYSILENT'
+    '/SUPPRESSMSGBOXES'
+    '/NORESTART'
+    '/SP-'
+    ('/DIR="' + \$install + '"')
+  )
+  \$process = Start-Process -FilePath \$installer -ArgumentList \$arguments -Wait -PassThru
+  if (\$process.ExitCode -ne 0) {
+    throw "Weekra installer failed with exit code \$(\$process.ExitCode)."
   }
-  Expand-Archive -LiteralPath \$archive -DestinationPath \$staging -Force
-  & robocopy.exe \$staging \$install /E /R:3 /W:1 /NFL /NDL /NJH /NJS
-  if (\$LASTEXITCODE -ge 8) {
-    throw "Robocopy failed with exit code \$LASTEXITCODE."
+  if (-not (Test-Path -LiteralPath \$executable)) {
+    throw 'Weekra executable was not found after installation.'
   }
   Start-Process -FilePath \$executable -WorkingDirectory \$install
 } catch {
   \$_ | Out-File -LiteralPath \$log -Encoding UTF8
-  Start-Process -FilePath \$executable -WorkingDirectory \$install
+  if (Test-Path -LiteralPath \$executable) {
+    Start-Process -FilePath \$executable -WorkingDirectory \$install
+  }
 }
 ''';
 }

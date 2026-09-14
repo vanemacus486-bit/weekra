@@ -95,5 +95,11 @@
   "checkForUpdates": "[Check for application updates]",
   "updateChecking": "[Checking for application updates…]",
   "updateUpToDate": "[You are already using the latest application version.]",
-  "updateCheckFailed": "[Unable to connect to updates. Check your network and retry from Settings.]"
+  "updateCheckFailed": "[Unable to connect to updates. Check your network and retry from Settings.]",
+  "settingsAppearanceDescription": "⟦Choose an expressive visual theme that fits your personal rhythm.⟧",
+  "settingsLanguageDescription": "⟦Choose the complete display language used throughout Weekra.⟧",
+  "settingsAbout": "⟦About this Weekra application⟧",
+  "settingsAboutDescription": "⟦View detailed version information and keep Weekra completely up to date.⟧",
+  "settingsVersion": "⟦Installed application version⟧",
+  "settingsUpdateDescription": "⟦Download a fully verified installer, complete the update safely, and restart Weekra.⟧"
 }
