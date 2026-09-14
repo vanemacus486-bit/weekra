@@ -36,6 +36,11 @@ Settings. Failures are visible and retryable; Settings shows the current version
 and latest check status. Downloads time out if the connection stops transmitting
 and still require the release SHA-256 digest before installation.
 
+The detached PowerShell installer receives Weekra's process ID explicitly and
+waits for that process before replacing files. Do not use PowerShell's `$PID`
+for this wait: variable names are case-insensitive and `$PID` always identifies
+the PowerShell host itself, which would deadlock the update indefinitely.
+
 A functioning GitHub connection is required for this release channel. This does
 not bypass network restrictions or retrofit an updater into a binary that never
 contained one. Windows replacement/relaunch needs Windows validation; Linux

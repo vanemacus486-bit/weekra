@@ -147,31 +147,16 @@ class WindowsUpdateService implements UpdateService {
     final stagingDirectory = '${workDirectory.path}\\payload';
     final logPath = '${workDirectory.path}\\update.log';
     final script = File('${workDirectory.path}\\install-update.ps1');
-    final scriptContents =
-        '''
-\$ErrorActionPreference = 'Stop'
-\$archive = '${_powerShellLiteral(archive.path)}'
-\$staging = '${_powerShellLiteral(stagingDirectory)}'
-\$install = '${_powerShellLiteral(installDirectory)}'
-\$executable = '${_powerShellLiteral(executable.path)}'
-\$log = '${_powerShellLiteral(logPath)}'
-
-try {
-  Wait-Process -Id $pid -ErrorAction SilentlyContinue
-  if (Test-Path -LiteralPath \$staging) {
-    Remove-Item -LiteralPath \$staging -Recurse -Force
-  }
-  Expand-Archive -LiteralPath \$archive -DestinationPath \$staging -Force
-  & robocopy.exe \$staging \$install /E /R:3 /W:1 /NFL /NDL /NJH /NJS
-  if (\$LASTEXITCODE -ge 8) {
-    throw "Robocopy failed with exit code \$LASTEXITCODE."
-  }
-  Start-Process -FilePath \$executable -WorkingDirectory \$install
-} catch {
-  \$_ | Out-File -LiteralPath \$log -Encoding UTF8
-  Start-Process -FilePath \$executable -WorkingDirectory \$install
-}
-''';
+    // PowerShell's case-insensitive $PID variable identifies PowerShell itself.
+    // Give the Weekra process a distinct variable so the installer can outlive it.
+    final scriptContents = buildWindowsInstallerScript(
+      archivePath: archive.path,
+      stagingDirectory: stagingDirectory,
+      installDirectory: installDirectory,
+      executablePath: executable.path,
+      logPath: logPath,
+      appProcessId: pid,
+    );
     await script.writeAsString(scriptContents, flush: true);
     await Process.start('powershell.exe', [
       '-NoProfile',
@@ -186,11 +171,46 @@ try {
     exit(0);
   }
 
-  String _powerShellLiteral(String value) => value.replaceAll("'", "''");
-
   void _requireHttps(Uri uri) {
     if (uri.scheme != 'https' || uri.host.isEmpty) {
       throw const FormatException('Update URLs must use HTTPS.');
     }
   }
+}
+
+String buildWindowsInstallerScript({
+  required String archivePath,
+  required String stagingDirectory,
+  required String installDirectory,
+  required String executablePath,
+  required String logPath,
+  required int appProcessId,
+}) {
+  String literal(String value) => value.replaceAll("'", "''");
+
+  return '''
+\$ErrorActionPreference = 'Stop'
+\$archive = '${literal(archivePath)}'
+\$staging = '${literal(stagingDirectory)}'
+\$install = '${literal(installDirectory)}'
+\$executable = '${literal(executablePath)}'
+\$log = '${literal(logPath)}'
+\$appPid = $appProcessId
+
+try {
+  Wait-Process -Id \$appPid -ErrorAction SilentlyContinue
+  if (Test-Path -LiteralPath \$staging) {
+    Remove-Item -LiteralPath \$staging -Recurse -Force
+  }
+  Expand-Archive -LiteralPath \$archive -DestinationPath \$staging -Force
+  & robocopy.exe \$staging \$install /E /R:3 /W:1 /NFL /NDL /NJH /NJS
+  if (\$LASTEXITCODE -ge 8) {
+    throw "Robocopy failed with exit code \$LASTEXITCODE."
+  }
+  Start-Process -FilePath \$executable -WorkingDirectory \$install
+} catch {
+  \$_ | Out-File -LiteralPath \$log -Encoding UTF8
+  Start-Process -FilePath \$executable -WorkingDirectory \$install
+}
+''';
 }
