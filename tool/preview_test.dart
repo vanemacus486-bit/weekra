@@ -218,7 +218,7 @@ Future<void> _loadFont(String family, String path) async {
 }
 
 List<CalendarEvent> _previewEvents({required bool crowded}) {
-  final weekStart = DateTime(2026, 9, 7);
+  final weekStart = _fixedNow.subtract(const Duration(days: 3));
 
   DateTime at(int dayIndex, int hour, [int minute = 0]) {
     final day = weekStart.add(Duration(days: dayIndex));
@@ -300,7 +300,7 @@ List<CalendarEvent> _previewEvents({required bool crowded}) {
     ),
     CalendarEvent(
       id: 'edge-adjust',
-      title: 'Sunday planning review',
+      title: 'Saturday planning review',
       start: at(6, 18),
       end: at(6, 19),
       color: const Color(0xFF7F9DD4),
