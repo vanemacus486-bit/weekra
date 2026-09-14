@@ -57,8 +57,11 @@ class WindowsUpdateService implements UpdateService {
       return null;
     }
 
-    final url = windows['url'];
-    final expectedHash = windows['sha256'];
+    // New clients use the verified installer while 0.5.4 and earlier keep
+    // consuming the portable archive fields from the same manifest.
+    final url = windows['installerUrl'] ?? windows['url'];
+    final expectedHash =
+        windows['installerSha256'] ?? windows['sha256'];
     if (url is! String ||
         expectedHash is! String ||
         !RegExp(r'^[a-fA-F0-9]{64}$').hasMatch(expectedHash)) {
