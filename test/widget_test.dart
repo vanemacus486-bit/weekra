@@ -121,6 +121,13 @@ void main() {
           .toList(growable: false);
       expect(keys.toSet(), hasLength(keys.length));
       expect(keys.length, lessThanOrEqualTo(4));
+      expect(
+        find.descendant(
+          of: flowingDateLayers(),
+          matching: find.byType(RepaintBoundary),
+        ),
+        findsNothing,
+      );
     }
     for (var index = 0; index < 10; index++) {
       await tester.tap(find.byKey(const Key('timeline-previous-day')));
@@ -131,6 +138,13 @@ void main() {
           .toList(growable: false);
       expect(keys.toSet(), hasLength(keys.length));
       expect(keys.length, lessThanOrEqualTo(4));
+      expect(
+        find.descendant(
+          of: flowingDateLayers(),
+          matching: find.byType(RepaintBoundary),
+        ),
+        findsNothing,
+      );
     }
     await tester.pumpAndSettle();
 
