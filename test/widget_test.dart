@@ -83,9 +83,7 @@ void main() {
 
     await tester.tap(find.byKey(const Key('timeline-next-day')));
     await tester.pump(const Duration(milliseconds: 70));
-    final incoming = find.byKey(
-      const ValueKey('hourly-header-20260912'),
-    );
+    final incoming = find.byKey(const ValueKey('hourly-header-20260912'));
     expect(
       find.byKey(const ValueKey('hourly-header-20260911')),
       findsOneWidget,
@@ -172,12 +170,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    final scroll = tester
-        .widget<SingleChildScrollView>(find.byKey(const Key('hourly-scroll')))
-        .controller!;
     for (final minute in [30, 23 * 60 + 45]) {
-      scroll.jumpTo(minute < 60 ? 0 : scroll.position.maxScrollExtent);
-      await tester.pumpAndSettle();
       final grid = tester.getRect(find.byKey(const Key('week-hourly-grid')));
       final point = Offset(
         grid.left + grid.width * .3,
@@ -200,6 +193,53 @@ void main() {
       store.savedEvents.last.end.day,
       store.savedEvents.last.start.add(const Duration(days: 1)).day,
     );
+    _restoreTestPlatform();
+  });
+
+  testWidgets('fits all 24 hours and magnifies a short event in place', (
+    tester,
+  ) async {
+    _useViewport(tester, const Size(1280, 800));
+    _useDesktopPlatform();
+    final now = DateTime(2026, 9, 14, 13, 30);
+    final event = CalendarEvent(
+      id: 'focus-short',
+      title: 'Quick check-in',
+      start: DateTime(2026, 9, 11, 14),
+      end: DateTime(2026, 9, 11, 14, 15),
+      color: const Color(0xFFF1776C),
+    );
+    await tester.pumpWidget(
+      WeekraApp(
+        eventStore: _MemoryEventStore([event]),
+        locale: const Locale('en'),
+        enableAutomaticUpdates: false,
+        clock: () => now,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final grid = tester.getRect(find.byKey(const Key('week-hourly-grid')));
+    final viewport = tester.getRect(find.byKey(const Key('hourly-viewport')));
+    expect(grid.height, closeTo(viewport.height, .1));
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('week-hourly-layout')),
+        matching: find.byType(Scrollable),
+      ),
+      findsNothing,
+    );
+
+    final surface = find.byKey(const Key('hourly-event-surface-focus-short-0'));
+    final overviewHeight = tester.getRect(surface).height;
+    await tester.tap(
+      find.byKey(const Key('hourly-event-focus-short')),
+      kind: PointerDeviceKind.mouse,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('timeline-focus-lens')), findsOneWidget);
+    expect(tester.getRect(surface).height, greaterThan(overviewHeight * 2));
     _restoreTestPlatform();
   });
 
@@ -723,7 +763,7 @@ void main() {
       ),
       kind: PointerDeviceKind.mouse,
     );
-    await gesture.moveBy(const Offset(0, 90));
+    await gesture.moveBy(const Offset(0, 120));
     await tester.pump();
 
     expect(find.byKey(const Key('draft-event')), findsOneWidget);
@@ -779,7 +819,7 @@ void main() {
     final moved = store.savedEvents.single;
     expect(moved.start.day, original.start.add(const Duration(days: 1)).day);
     expect(moved.start.hour, 9);
-    expect(moved.start.minute, 30);
+    expect(moved.start.minute, 15);
     expect(moved.durationMinutes, original.durationMinutes);
     _restoreTestPlatform();
   });
