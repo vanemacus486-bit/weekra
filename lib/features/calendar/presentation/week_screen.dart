@@ -1137,6 +1137,9 @@ class _WeekHourlyLayoutState extends State<_WeekHourlyLayout> {
     return renderObject.globalToLocal(globalPosition);
   }
 
+  _TimelineScale _interactionScale(_TimelineScale renderedScale) =>
+      _TimelineScale(height: renderedScale.height, focusMinute: _focusMinute);
+
   void _selectNewSlot(
     Offset globalPosition, {
     required double gutterWidth,
@@ -1214,9 +1217,9 @@ class _WeekHourlyLayoutState extends State<_WeekHourlyLayout> {
     }
     const firstMinute = 0;
     const lastMinute = 24 * 60;
-    final current = _snapMinutes(scale.minuteForY(position.dy))
-        .clamp(firstMinute, lastMinute)
-        .toInt();
+    final current = _snapMinutes(
+      _interactionScale(scale).minuteForY(position.dy),
+    ).clamp(firstMinute, lastMinute).toInt();
     final startMinute = math.min(anchor, current);
     final endMinute = math
         .max(math.max(anchor, current), startMinute + _minimumEventMinutes)
@@ -1347,9 +1350,9 @@ class _WeekHourlyLayoutState extends State<_WeekHourlyLayout> {
       lastMinute - firstMinute,
     );
     final maxStart = math.max(firstMinute, lastMinute - duration);
-    final minute = _snapMinutes(scale.minuteForY(position.dy) - duration / 2)
-        .clamp(firstMinute, maxStart)
-        .toInt();
+    final minute = _snapMinutes(
+      _interactionScale(scale).minuteForY(position.dy) - duration / 2,
+    ).clamp(firstMinute, maxStart).toInt();
     final day = widget.days[dayIndex];
     final start = _dateAtMinute(day, minute);
     final updated = _copyEvent(
@@ -1427,7 +1430,9 @@ class _WeekHourlyLayoutState extends State<_WeekHourlyLayout> {
     if (position == null) {
       return;
     }
-    final pointerMinute = _snapMinutes(scale.minuteForY(position.dy));
+    final pointerMinute = _snapMinutes(
+      _interactionScale(scale).minuteForY(position.dy),
+    );
     final day = DateTime(
       origin.start.year,
       origin.start.month,
@@ -1935,7 +1940,9 @@ class _WeekHourlyLayoutState extends State<_WeekHourlyLayout> {
     if (position == null) {
       return;
     }
-    final pointerMinute = _snapMinutes(scale.minuteForY(position.dy));
+    final pointerMinute = _snapMinutes(
+      _interactionScale(scale).minuteForY(position.dy),
+    );
     final day = DateTime(
       origin.start.year,
       origin.start.month,
@@ -2801,7 +2808,7 @@ class _GridEvent extends StatelessWidget {
     final timeRange = '$startLabel – ${_formatTime(context, event.endMinutes)}';
     final isShort = bodyHeight < 48;
     final isTiny = laneWidth < 22 || bodyHeight < 15;
-    final verticalPadding = bodyHeight < 16
+    final verticalPadding = bodyHeight < 24
         ? 1.0
         : isShort
         ? 3.0
