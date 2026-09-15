@@ -105,6 +105,44 @@ void main() {
       find.byKey(const ValueKey('hourly-header-20260912')),
       findsOneWidget,
     );
+
+    Finder flowingDateLayers() => find.byWidgetPredicate((widget) {
+      final key = widget.key;
+      return key is ValueKey<String> &&
+          key.value.startsWith('flowing-date-layer-');
+    });
+
+    for (var index = 0; index < 10; index++) {
+      await tester.tap(find.byKey(const Key('timeline-next-day')));
+      await tester.pump(const Duration(milliseconds: 12));
+      final keys = tester
+          .widgetList(flowingDateLayers())
+          .map((widget) => widget.key)
+          .toList(growable: false);
+      expect(keys.toSet(), hasLength(keys.length));
+      expect(keys.length, lessThanOrEqualTo(4));
+    }
+    for (var index = 0; index < 10; index++) {
+      await tester.tap(find.byKey(const Key('timeline-previous-day')));
+      await tester.pump(const Duration(milliseconds: 12));
+      final keys = tester
+          .widgetList(flowingDateLayers())
+          .map((widget) => widget.key)
+          .toList(growable: false);
+      expect(keys.toSet(), hasLength(keys.length));
+      expect(keys.length, lessThanOrEqualTo(4));
+    }
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('hourly-header-20260912')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('hourly-canvas-20260912')),
+      findsOneWidget,
+    );
+    expect(flowingDateLayers(), findsNWidgets(2));
     expect(tester.takeException(), isNull);
   });
 
