@@ -2040,6 +2040,7 @@ class _FlowingDateSwitcherState extends State<_FlowingDateSwitcher>
   double _incomingBeginOffset = 0;
   double _outgoingBeginOffset = 0;
   double _outgoingEndOffset = 0;
+  int _transitionDirection = 1;
 
   @override
   void initState() {
@@ -2057,24 +2058,32 @@ class _FlowingDateSwitcherState extends State<_FlowingDateSwitcher>
       return;
     }
 
-    final progress = _flowCurve.transform(_controller.value);
-    final currentOffset = _incomingBeginOffset * (1 - progress);
+    // A new input must never inherit a partially composed pair of canvases.
+    // Settle on the most recent target first, then begin one clean column move.
+    // This keeps clicks responsive without carrying a third stale layer forward.
+    if (_controller.isAnimating) {
+      _controller.stop();
+      _outgoingChild = null;
+      _incomingBeginOffset = 0;
+      _outgoingBeginOffset = 0;
+      _outgoingEndOffset = 0;
+    }
+
     final direction = widget.direction == 0 ? 1 : widget.direction.sign;
     final distance = widget.travelDistance.abs();
 
+    _transitionDirection = direction;
     _outgoingChild = _currentChild;
-    _outgoingBeginOffset = currentOffset.clamp(-distance, distance).toDouble();
+    _outgoingBeginOffset = 0;
     _outgoingEndOffset = -direction * distance;
-    _incomingBeginOffset = (currentOffset + direction * distance)
-        .clamp(-distance, distance)
-        .toDouble();
+    _incomingBeginOffset = direction * distance;
     _currentChild = widget.child;
 
-    final baseDuration = WeekraMotion.resolve(
+    final duration = WeekraMotion.resolve(
       context,
       const Duration(milliseconds: 290),
     );
-    if (baseDuration == Duration.zero || distance == 0) {
+    if (duration == Duration.zero || distance == 0) {
       _controller.stop();
       _controller.value = 1;
       _outgoingChild = null;
@@ -2082,11 +2091,7 @@ class _FlowingDateSwitcherState extends State<_FlowingDateSwitcher>
       return;
     }
 
-    final distanceFactor = (_incomingBeginOffset.abs() / distance)
-        .clamp(.45, 2.2);
-    _controller.duration = Duration(
-      microseconds: (baseDuration.inMicroseconds * distanceFactor).round(),
-    );
+    _controller.duration = duration;
     _controller.forward(from: 0);
   }
 
@@ -2117,6 +2122,8 @@ class _FlowingDateSwitcherState extends State<_FlowingDateSwitcher>
       return _FlowingDateLayer(
         key: _layerKey(_currentChild),
         horizontalOffset: 0,
+        clip: _FlowingDateClip.full,
+        clipExtent: 0,
         interactive: true,
         child: _currentChild,
       );
@@ -2130,18 +2137,28 @@ class _FlowingDateSwitcherState extends State<_FlowingDateSwitcher>
             _outgoingBeginOffset +
             (_outgoingEndOffset - _outgoingBeginOffset) * progress;
         final incomingOffset = _incomingBeginOffset * (1 - progress);
+        final seamExtent = incomingOffset.abs();
+        final movesForward = _transitionDirection > 0;
         return Stack(
           fit: StackFit.expand,
           children: [
             _FlowingDateLayer(
               key: _layerKey(outgoingChild),
               horizontalOffset: outgoingOffset,
+              clip: movesForward
+                  ? _FlowingDateClip.leading
+                  : _FlowingDateClip.trailing,
+              clipExtent: seamExtent,
               interactive: false,
               child: outgoingChild,
             ),
             _FlowingDateLayer(
               key: _layerKey(_currentChild),
               horizontalOffset: incomingOffset,
+              clip: movesForward
+                  ? _FlowingDateClip.exceptLeading
+                  : _FlowingDateClip.exceptTrailing,
+              clipExtent: seamExtent,
               interactive: true,
               child: _currentChild,
             ),
@@ -2155,16 +2172,22 @@ class _FlowingDateSwitcherState extends State<_FlowingDateSwitcher>
       ValueKey('flowing-date-layer-${child.key}');
 }
 
+enum _FlowingDateClip { full, leading, trailing, exceptLeading, exceptTrailing }
+
 class _FlowingDateLayer extends StatelessWidget {
   const _FlowingDateLayer({
     super.key,
     required this.child,
     required this.horizontalOffset,
+    required this.clip,
+    required this.clipExtent,
     required this.interactive,
   });
 
   final Widget child;
   final double horizontalOffset;
+  final _FlowingDateClip clip;
+  final double clipExtent;
   final bool interactive;
 
   @override
@@ -2173,15 +2196,59 @@ class _FlowingDateLayer extends StatelessWidget {
       ignoring: !interactive,
       child: ExcludeSemantics(
         excluding: !interactive,
-        child: Transform.translate(
-          offset: Offset(horizontalOffset, 0),
-          // Keep the expensive calendar painting stable. Only the lightweight
-          // transform layer moves while rapid navigation is retargeted.
-          child: RepaintBoundary(child: child),
+        child: ClipRect(
+          clipper: _FlowingDateClipper(mode: clip, extent: clipExtent),
+          child: Transform.translate(
+            offset: Offset(horizontalOffset, 0),
+            child: child,
+          ),
         ),
       ),
     );
   }
+}
+
+class _FlowingDateClipper extends CustomClipper<Rect> {
+  const _FlowingDateClipper({required this.mode, required this.extent});
+
+  final _FlowingDateClip mode;
+  final double extent;
+
+  @override
+  Rect getClip(Size size) {
+    final clippedExtent = extent.clamp(0.0, size.width).toDouble();
+    return switch (mode) {
+      _FlowingDateClip.full => Offset.zero & size,
+      _FlowingDateClip.leading => Rect.fromLTWH(
+        0,
+        0,
+        clippedExtent,
+        size.height,
+      ),
+      _FlowingDateClip.trailing => Rect.fromLTWH(
+        size.width - clippedExtent,
+        0,
+        clippedExtent,
+        size.height,
+      ),
+      _FlowingDateClip.exceptLeading => Rect.fromLTWH(
+        clippedExtent,
+        0,
+        size.width - clippedExtent,
+        size.height,
+      ),
+      _FlowingDateClip.exceptTrailing => Rect.fromLTWH(
+        0,
+        0,
+        size.width - clippedExtent,
+        size.height,
+      ),
+    };
+  }
+
+  @override
+  bool shouldReclip(covariant _FlowingDateClipper oldClipper) =>
+      mode != oldClipper.mode || extent != oldClipper.extent;
 }
 
 class _GridDayHeader extends StatelessWidget {
