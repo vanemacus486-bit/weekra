@@ -2799,9 +2799,7 @@ class _GridEvent extends StatelessWidget {
         lane * (laneWidth + laneGap);
     final startLabel = _formatTime(context, event.startMinutes);
     final timeRange = '$startLabel – ${_formatTime(context, event.endMinutes)}';
-    final isShort = bodyHeight < 34;
-    final showInlineTime = isShort && laneWidth >= 96;
-    final isCramped = laneWidth < 70;
+    final isShort = bodyHeight < 48;
     final isTiny = laneWidth < 22 || bodyHeight < 15;
     final verticalPadding = bodyHeight < 16
         ? 1.0
@@ -2952,107 +2950,14 @@ class _GridEvent extends StatelessWidget {
                                     ),
                                   ],
                           ),
-                          child: isTiny
-                              ? const SizedBox.shrink()
-                              : isManipulating || isResizing
-                              ? Text(
-                                  timeRange,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    color: _ink,
-                                    fontSize: narrow ? 8.5 : 10,
-                                    height: 1.1,
-                                    fontWeight: FontWeight.w700,
-                                    fontFeatures: const [
-                                      FontFeature.tabularFigures(),
-                                    ],
-                                  ),
-                                )
-                              : isShort
-                              ? Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        event.title,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          color: _ink,
-                                          fontSize: narrow ? 9.5 : 11.5,
-                                          height: 1.1,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ),
-                                    if (showInlineTime) ...[
-                                      const SizedBox(width: 5),
-                                      Text(
-                                        startLabel,
-                                        maxLines: 1,
-                                        style: const TextStyle(
-                                          color: _mutedInk,
-                                          fontSize: 9,
-                                          height: 1,
-                                          fontFeatures: [
-                                            FontFeature.tabularFigures(),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ],
-                                )
-                              : Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      event.title,
-                                      maxLines: isCramped
-                                          ? 1
-                                          : bodyHeight >= 82
-                                          ? 2
-                                          : 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        color: _ink,
-                                        fontSize: narrow ? 10.5 : 12.5,
-                                        height: 1.15,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                    if (!isCramped) ...[
-                                      const SizedBox(height: 3),
-                                      Text(
-                                        timeRange,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        softWrap: false,
-                                        style: TextStyle(
-                                          color: _mutedInk,
-                                          fontSize: narrow ? 8.5 : 10,
-                                          height: 1.1,
-                                          fontFeatures: const [
-                                            FontFeature.tabularFigures(),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                    if (event.location != null &&
-                                        bodyHeight >= 86) ...[
-                                      const SizedBox(height: 5),
-                                      Text(
-                                        event.location!,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          color: _tertiaryInk,
-                                          fontSize: narrow ? 8.5 : 10,
-                                          height: 1.1,
-                                        ),
-                                      ),
-                                    ],
-                                  ],
-                                ),
+                          child: _GridEventContents(
+                            event: event,
+                            startLabel: startLabel,
+                            timeRange: timeRange,
+                            laneWidth: laneWidth,
+                            narrow: narrow,
+                            manipulating: isManipulating || isResizing,
+                          ),
                         ),
                       ),
                     ),
@@ -3097,6 +3002,127 @@ class _GridEvent extends StatelessWidget {
           ],
         ],
       ),
+    );
+  }
+}
+
+class _GridEventContents extends StatelessWidget {
+  const _GridEventContents({
+    required this.event,
+    required this.startLabel,
+    required this.timeRange,
+    required this.laneWidth,
+    required this.narrow,
+    required this.manipulating,
+  });
+
+  final CalendarEvent event;
+  final String startLabel;
+  final String timeRange;
+  final double laneWidth;
+  final bool narrow;
+  final bool manipulating;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final height = constraints.maxHeight;
+        final cramped = laneWidth < 70;
+        if (laneWidth < 22 || height < 11) {
+          return const SizedBox.shrink();
+        }
+        if (manipulating) {
+          return Text(
+            timeRange,
+            maxLines: height >= 22 ? 2 : 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: _ink,
+              fontSize: narrow ? 8.5 : 10,
+              height: 1.1,
+              fontWeight: FontWeight.w700,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+          );
+        }
+        if (height < 31) {
+          return Row(
+            children: [
+              Expanded(
+                child: Text(
+                  event.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: _ink,
+                    fontSize: narrow ? 9.5 : 11.5,
+                    height: 1.1,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              if (laneWidth >= 96) ...[
+                const SizedBox(width: 5),
+                Text(
+                  startLabel,
+                  maxLines: 1,
+                  style: const TextStyle(
+                    color: _mutedInk,
+                    fontSize: 9,
+                    height: 1,
+                    fontFeatures: [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ],
+            ],
+          );
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              event.title,
+              maxLines: !cramped && height >= 48 ? 2 : 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: _ink,
+                fontSize: narrow ? 10.5 : 12.5,
+                height: 1.15,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            if (!cramped) ...[
+              const SizedBox(height: 3),
+              Text(
+                timeRange,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                softWrap: false,
+                style: TextStyle(
+                  color: _mutedInk,
+                  fontSize: narrow ? 8.5 : 10,
+                  height: 1.1,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              ),
+            ],
+            if (event.location != null && height >= 64) ...[
+              const SizedBox(height: 5),
+              Text(
+                event.location!,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: _tertiaryInk,
+                  fontSize: narrow ? 8.5 : 10,
+                  height: 1.1,
+                ),
+              ),
+            ],
+          ],
+        );
+      },
     );
   }
 }
