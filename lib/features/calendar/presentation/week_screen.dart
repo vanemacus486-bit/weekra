@@ -2060,12 +2060,14 @@ class _FlowingDateSwitcherState extends State<_FlowingDateSwitcher>
     final progress = _flowCurve.transform(_controller.value);
     final currentOffset = _incomingBeginOffset * (1 - progress);
     final direction = widget.direction == 0 ? 1 : widget.direction.sign;
-    final distance = widget.travelDistance;
+    final distance = widget.travelDistance.abs();
 
     _outgoingChild = _currentChild;
-    _outgoingBeginOffset = currentOffset;
+    _outgoingBeginOffset = currentOffset.clamp(-distance, distance).toDouble();
     _outgoingEndOffset = -direction * distance;
-    _incomingBeginOffset = currentOffset + direction * distance;
+    _incomingBeginOffset = (currentOffset + direction * distance)
+        .clamp(-distance, distance)
+        .toDouble();
     _currentChild = widget.child;
 
     final baseDuration = WeekraMotion.resolve(
@@ -2112,7 +2114,12 @@ class _FlowingDateSwitcherState extends State<_FlowingDateSwitcher>
   Widget build(BuildContext context) {
     final outgoingChild = _outgoingChild;
     if (outgoingChild == null) {
-      return RepaintBoundary(child: _currentChild);
+      return _FlowingDateLayer(
+        key: _layerKey(_currentChild),
+        horizontalOffset: 0,
+        interactive: true,
+        child: _currentChild,
+      );
     }
 
     return AnimatedBuilder(
@@ -2126,25 +2133,53 @@ class _FlowingDateSwitcherState extends State<_FlowingDateSwitcher>
         return Stack(
           fit: StackFit.expand,
           children: [
-            IgnorePointer(
-              child: ExcludeSemantics(
-                child: RepaintBoundary(
-                  child: Transform.translate(
-                    offset: Offset(outgoingOffset, 0),
-                    child: outgoingChild,
-                  ),
-                ),
-              ),
+            _FlowingDateLayer(
+              key: _layerKey(outgoingChild),
+              horizontalOffset: outgoingOffset,
+              interactive: false,
+              child: outgoingChild,
             ),
-            RepaintBoundary(
-              child: Transform.translate(
-                offset: Offset(incomingOffset, 0),
-                child: _currentChild,
-              ),
+            _FlowingDateLayer(
+              key: _layerKey(_currentChild),
+              horizontalOffset: incomingOffset,
+              interactive: true,
+              child: _currentChild,
             ),
           ],
         );
       },
+    );
+  }
+
+  ValueKey<String> _layerKey(Widget child) =>
+      ValueKey('flowing-date-layer-${child.key}');
+}
+
+class _FlowingDateLayer extends StatelessWidget {
+  const _FlowingDateLayer({
+    super.key,
+    required this.child,
+    required this.horizontalOffset,
+    required this.interactive,
+  });
+
+  final Widget child;
+  final double horizontalOffset;
+  final bool interactive;
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      ignoring: !interactive,
+      child: ExcludeSemantics(
+        excluding: !interactive,
+        child: Transform.translate(
+          offset: Offset(horizontalOffset, 0),
+          // Keep the expensive calendar painting stable. Only the lightweight
+          // transform layer moves while rapid navigation is retargeted.
+          child: RepaintBoundary(child: child),
+        ),
+      ),
     );
   }
 }
