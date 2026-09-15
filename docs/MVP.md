@@ -45,10 +45,9 @@ illustrations, written copy, or other protected brand assets.
 - Click an empty hourly slot to create a one-hour event at that hour's start,
   or drag across empty time with 15-minute precision to choose the exact range
   before editing it.
-- Click an event for details. Drag its body to move it, or use the visible top
-  and bottom handles to change its length.
-- Right-click an event to open the nearby time adjustment card for its start,
-  end, and duration.
+- Click an event for details. Drag its body to move it; hover near its top or
+  bottom edge and drag when the resize cursor appears to change its length.
+- Right-click an event for direct edit, copy, delete, and category actions.
 - Press Escape to cancel the current draft, move, resize, or floating card.
 
 Touch keeps the existing press-and-drag gesture for moving events and selecting

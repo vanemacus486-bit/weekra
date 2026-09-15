@@ -67,7 +67,9 @@ The first UI slice is in place:
 - Responsive event blocks backed by a small domain model
 - Timepage-style direct manipulation in Hourly view: click for a one-hour event
   aligned to the containing hour, or drag with 15-minute precision; press and
-  drag to move, and pull either event edge to resize
+  drag the event body to move, or hover and pull either edge to resize
+- Compact right-click menu for editing, copying, deleting, or recategorizing
+  an event without opening its details first
 - A visible 24:00 label and bottom rule keep the full-day boundary explicit
 - Compact glass event editor with date, time, category, and optional location
 - Offline JSON persistence in the app documents directory
