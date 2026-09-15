@@ -65,8 +65,10 @@ The first UI slice is in place:
 - Current-day and current-time emphasis
 - Previous/next week navigation, including horizontal swipe
 - Responsive event blocks backed by a small domain model
-- Timepage-style direct manipulation in Hourly view: select or drag to create,
-  press and drag to move, and pull either event edge to resize
+- Timepage-style direct manipulation in Hourly view: click for a one-hour event
+  aligned to the containing hour, or drag with 15-minute precision; press and
+  drag to move, and pull either event edge to resize
+- A visible 24:00 label and bottom rule keep the full-day boundary explicit
 - Compact glass event editor with date, time, category, and optional location
 - Offline JSON persistence in the app documents directory
 - Event detail, editing, and confirmed deletion flows

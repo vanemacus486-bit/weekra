@@ -42,8 +42,9 @@ illustrations, written copy, or other protected brand assets.
 
 ## Desktop week controls
 
-- Click an empty hourly slot to create a one-hour event, or drag across empty
-  time to choose a range before editing it.
+- Click an empty hourly slot to create a one-hour event at that hour's start,
+  or drag across empty time with 15-minute precision to choose the exact range
+  before editing it.
 - Click an event for details. Drag its body to move it, or use the visible top
   and bottom handles to change its length.
 - Right-click an event to open the nearby time adjustment card for its start,

@@ -158,7 +158,9 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('can create in both ends of the full day', (tester) async {
+  testWidgets('single click starts at the containing whole hour', (
+    tester,
+  ) async {
     _useViewport(tester, const Size(1280, 800));
     _useDesktopPlatform();
     final store = _MemoryEventStore();
@@ -170,23 +172,23 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    for (final minute in [30, 23 * 60 + 45]) {
+    for (final target in [(12, 0), (23 * 60 + 48, 23 * 60)]) {
       final grid = tester.getRect(find.byKey(const Key('week-hourly-grid')));
       final point = Offset(
         grid.left + grid.width * .3,
-        grid.top + grid.height * minute / (24 * 60) + 1,
+        grid.top + grid.height * target.$1 / (24 * 60),
       );
       await tester.tapAt(point, kind: PointerDeviceKind.mouse);
       await tester.pumpAndSettle();
       await tester.enterText(
         find.byKey(const Key('event-title')),
-        'At $minute',
+        'At ${target.$2}',
       );
       await tester.ensureVisible(find.byKey(const Key('save-event')));
       await tester.tap(find.byKey(const Key('save-event')));
       await tester.pumpAndSettle();
-      expect(store.savedEvents.last.startMinutes, minute);
-      expect(store.savedEvents.last.durationMinutes, minute > 1380 ? 15 : 60);
+      expect(store.savedEvents.last.startMinutes, target.$2);
+      expect(store.savedEvents.last.durationMinutes, 60);
     }
     expect(store.savedEvents.last.end.hour, 0);
     expect(
@@ -194,6 +196,31 @@ void main() {
       store.savedEvents.last.start.add(const Duration(days: 1)).day,
     );
     _restoreTestPlatform();
+  });
+
+  testWidgets('keeps the 24:00 boundary visible inside the viewport', (
+    tester,
+  ) async {
+    _useViewport(tester, const Size(1280, 800));
+    await tester.pumpWidget(
+      WeekraApp(
+        eventStore: _MemoryEventStore(),
+        locale: const Locale('en'),
+        enableAutomaticUpdates: false,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final grid = tester.getRect(find.byKey(const Key('week-hourly-grid')));
+    final dayEnd = find.byKey(const Key('timeline-day-end'));
+    final dayEndRect = tester.getRect(dayEnd);
+
+    expect(
+      find.descendant(of: dayEnd, matching: find.text('24:00')),
+      findsOneWidget,
+    );
+    expect(dayEndRect.top, greaterThanOrEqualTo(grid.top));
+    expect(dayEndRect.bottom, closeTo(grid.bottom, .1));
   });
 
   testWidgets('fits all 24 hours and magnifies a short event in place', (
@@ -756,10 +783,11 @@ void main() {
 
     final grid = find.byKey(const Key('week-hourly-grid'));
     final gridRect = tester.getRect(grid);
+    const dragStartMinute = 8 * 60 + 15;
     final gesture = await tester.startGesture(
       Offset(
         gridRect.left + gridRect.width * 0.2,
-        tester.getRect(find.byKey(const Key('hourly-scroll'))).top + 128,
+        gridRect.top + gridRect.height * dragStartMinute / (24 * 60),
       ),
       kind: PointerDeviceKind.mouse,
     );
@@ -781,6 +809,7 @@ void main() {
 
     expect(store.savedEvents, hasLength(1));
     expect(store.savedEvents.single.title, 'Dragged event');
+    expect(store.savedEvents.single.startMinutes, dragStartMinute);
     expect(store.savedEvents.single.start.minute % 15, 0);
     expect(store.savedEvents.single.durationMinutes, greaterThan(60));
     expect(store.savedEvents.single.durationMinutes % 15, 0);
