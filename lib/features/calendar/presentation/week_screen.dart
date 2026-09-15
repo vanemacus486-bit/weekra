@@ -1145,6 +1145,7 @@ class _WeekHourlyLayoutState extends State<_WeekHourlyLayout> {
     required double gutterWidth,
     required double columnWidth,
     required _TimelineScale scale,
+    required bool alignToHour,
   }) {
     _focusNode.requestFocus();
     final position = _gridPosition(globalPosition);
@@ -1164,9 +1165,11 @@ class _WeekHourlyLayoutState extends State<_WeekHourlyLayout> {
     const firstMinute = 0;
     const lastMinute = 24 * 60;
     const lastStartMinute = lastMinute - _gridSnapMinutes;
-    final minute = _snapMinutes(scale.minuteForY(position.dy))
-        .clamp(firstMinute, lastStartMinute)
-        .toInt();
+    final rawMinute = scale.minuteForY(position.dy);
+    final minute =
+        (alignToHour ? _hourStartForMinute(rawMinute) : _snapMinutes(rawMinute))
+            .clamp(firstMinute, lastStartMinute)
+            .toInt();
     final day = widget.days[dayIndex];
     final start = _dateAtMinute(day, minute);
 
@@ -1198,6 +1201,7 @@ class _WeekHourlyLayoutState extends State<_WeekHourlyLayout> {
       gutterWidth: gutterWidth,
       columnWidth: columnWidth,
       scale: scale,
+      alignToHour: false,
     );
     final draft = _draftEvent;
     if (draft == null) {
@@ -1662,6 +1666,7 @@ class _WeekHourlyLayoutState extends State<_WeekHourlyLayout> {
                           gutterWidth: gutterWidth,
                           columnWidth: columnWidth,
                           scale: scale,
+                          alignToHour: true,
                         );
                         _openDraftEditor();
                       },
@@ -1718,6 +1723,7 @@ class _WeekHourlyLayoutState extends State<_WeekHourlyLayout> {
                               top: scale.yForMinute(hour * 60),
                               gutterWidth: gutterWidth,
                               label: _formatTime(context, hour * 60),
+                              isDayEnd: hour == endHour,
                             ),
                           if (scale.hasFocus)
                             for (
@@ -2612,14 +2618,59 @@ class _HourRule extends StatelessWidget {
     required this.top,
     required this.gutterWidth,
     required this.label,
+    this.isDayEnd = false,
   });
 
   final double top;
   final double gutterWidth;
   final String label;
+  final bool isDayEnd;
 
   @override
   Widget build(BuildContext context) {
+    if (isDayEnd) {
+      return AnimatedPositionedDirectional(
+        key: const Key('timeline-day-end'),
+        start: 0,
+        end: 0,
+        bottom: 0,
+        height: 14,
+        duration: WeekraMotion.resolve(context, WeekraMotion.control),
+        curve: WeekraMotion.emphasized,
+        child: Stack(
+          children: [
+            PositionedDirectional(
+              start: 0,
+              bottom: 2,
+              width: gutterWidth,
+              child: Padding(
+                padding: const EdgeInsetsDirectional.only(end: 9),
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.visible,
+                  softWrap: false,
+                  textAlign: TextAlign.end,
+                  style: const TextStyle(
+                    color: _tertiaryInk,
+                    fontSize: 10,
+                    height: 1.2,
+                    fontWeight: FontWeight.w500,
+                    fontFeatures: [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ),
+            ),
+            PositionedDirectional(
+              start: gutterWidth,
+              end: 0,
+              bottom: 0,
+              child: const Divider(height: 1, color: _subtleLine),
+            ),
+          ],
+        ),
+      );
+    }
     return AnimatedPositionedDirectional(
       top: top,
       start: 0,
@@ -4814,6 +4865,10 @@ DateTime _dateAtMinute(DateTime date, int minute) {
 
 int _snapMinutes(num minutes) {
   return (minutes / _gridSnapMinutes).round() * _gridSnapMinutes;
+}
+
+int _hourStartForMinute(num minutes) {
+  return (minutes / Duration.minutesPerHour).floor() * Duration.minutesPerHour;
 }
 
 CalendarEvent _copyEvent(
