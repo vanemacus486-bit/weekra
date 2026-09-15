@@ -4861,11 +4861,6 @@ Rect? _globalRectFor(BuildContext? context) {
   return renderObject.localToGlobal(Offset.zero) & renderObject.size;
 }
 
-TimeOfDay _timeOfDayAt(int minute) {
-  final safeMinute = minute.clamp(0, 23 * 60 + 59).toInt();
-  return TimeOfDay(hour: safeMinute ~/ 60, minute: safeMinute % 60);
-}
-
 DateTime _atTime(DateTime date, TimeOfDay time) {
   return DateTime(date.year, date.month, date.day, time.hour, time.minute);
 }
@@ -4913,14 +4908,6 @@ String _categoryName(AppLocalizations l10n, String categoryId) {
     _ => l10n.uncategorized,
   };
 }
-
-const _fieldLabelStyle = TextStyle(
-  color: _mutedInk,
-  fontSize: 10,
-  height: 1.2,
-  fontWeight: FontWeight.w700,
-  letterSpacing: 1.3,
-);
 
 DateTime _centeredTimelineStart(DateTime date) {
   final day = DateTime(date.year, date.month, date.day);
