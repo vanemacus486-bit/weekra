@@ -60,7 +60,8 @@ The first UI slice is in place:
 
 - Timepage-inspired Grid summary and seven-column Hourly layouts
 - Hourly / Grid switching on phones, tablets, and desktops
-- Full 00:00–24:00 timeline with a scrollable initial daytime viewport
+- Full 00:00–24:00 timeline fitted into the available viewport without scrolling
+- Two-hour focus lens with 15-minute guides for precise local editing
 - Current-day and current-time emphasis
 - Previous/next week navigation, including horizontal swipe
 - Responsive event blocks backed by a small domain model
@@ -73,8 +74,10 @@ The first UI slice is in place:
 - Centered glass settings card with instant theme/language changes and update status
 - Pseudo-localization plus small-screen and large-type layout tests
 
-Direct event manipulation uses 15-minute snapping, tactile feedback, live
-previews, and a second tap to confirm a newly selected time range.
+Direct event manipulation uses 15-minute snapping, tactile feedback, and live
+previews. Short events keep their true visual duration while retaining a larger
+transparent pointer target, so the week stays accurate without becoming hard to
+edit.
 
 ## Internationalization
 

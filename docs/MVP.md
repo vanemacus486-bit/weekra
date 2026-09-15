@@ -35,6 +35,8 @@ illustrations, written copy, or other protected brand assets.
 
 - A new event can be created in under 10 seconds.
 - The user can identify free time in the current week without opening an event.
+- The complete 00:00–24:00 range remains visible without vertical scrolling;
+  selecting a local time range temporarily magnifies it for precise editing.
 - Week navigation and event manipulation remain smooth on the target devices.
 - Core calendar behavior works fully offline.
 
