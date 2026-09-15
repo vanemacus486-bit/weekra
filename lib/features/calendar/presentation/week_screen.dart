@@ -21,7 +21,6 @@ const _subtleLine = WeekraColors.dividerSubtle;
 const _gridSnapMinutes = 15;
 const _minimumEventMinutes = 15;
 const _defaultEventMinutes = 60;
-const _maximumAdjustMinute = 2 * 24 * 60 - _gridSnapMinutes;
 
 enum _WeekLayout { hourly, grid }
 
@@ -38,10 +37,11 @@ typedef _OpenEventCallback = Future<void> Function(
   Rect? anchorRect,
 });
 
-typedef _AdjustEventCallback = Future<void> Function(
-  CalendarEvent event,
-  Rect anchorRect,
-);
+typedef _EventContextMenuCallback = Future<void> Function(
+  CalendarEvent event, {
+  required Rect anchorRect,
+  required Offset position,
+});
 
 typedef _SaveEventCallback = Future<bool> Function(CalendarEvent event);
 
@@ -155,7 +155,6 @@ class _WeekScreenState extends State<WeekScreen> {
   }
 
   Future<void> _openEvent(CalendarEvent event, {Rect? anchorRect}) async {
-    final l10n = AppLocalizations.of(context);
     final action = await _showEventDetailsSheet(
       context,
       event,
@@ -166,30 +165,36 @@ class _WeekScreenState extends State<WeekScreen> {
     }
 
     if (action == _EventAction.edit) {
-      final updatedEvent = await _showEventEditorSheet(
-        context,
-        _weekStart,
-        existingEvent: event,
-        anchorRect: anchorRect,
-        suggestionEvents: _events,
-        onSave: (updatedEvent) async {
-          final updatedEvents =
-              _events
-                  .map((item) => item.id == event.id ? updatedEvent : item)
-                  .toList()
-                ..sort((a, b) => a.start.compareTo(b.start));
-          return _persistMutation(
-            updatedEvents,
-            failureMessage: AppLocalizations.of(context).eventChangesSaveError,
-          );
-        },
-      );
-      if (updatedEvent == null || !mounted) {
-        return;
-      }
+      await _editEvent(event, anchorRect: anchorRect);
       return;
     }
 
+    await _deleteEvent(event);
+  }
+
+  Future<void> _editEvent(CalendarEvent event, {Rect? anchorRect}) async {
+    await _showEventEditorSheet(
+      context,
+      _weekStart,
+      existingEvent: event,
+      anchorRect: anchorRect,
+      suggestionEvents: _events,
+      onSave: (updatedEvent) async {
+        final updatedEvents =
+            _events
+                .map((item) => item.id == event.id ? updatedEvent : item)
+                .toList()
+              ..sort((a, b) => a.start.compareTo(b.start));
+        return _persistMutation(
+          updatedEvents,
+          failureMessage: AppLocalizations.of(context).eventChangesSaveError,
+        );
+      },
+    );
+  }
+
+  Future<void> _deleteEvent(CalendarEvent event) async {
+    final l10n = AppLocalizations.of(context);
     final shouldDelete = await _confirmDelete(context, event);
     if (!shouldDelete || !mounted) {
       return;
@@ -200,16 +205,66 @@ class _WeekScreenState extends State<WeekScreen> {
     );
   }
 
-  Future<void> _adjustEventTime(CalendarEvent event, Rect anchorRect) async {
-    final updatedEvent = await _showEventTimeAdjustCard(
+  Future<void> _copyEventFromMenu(CalendarEvent event) async {
+    final duplicate = CalendarEvent(
+      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      title: event.title,
+      start: event.start,
+      end: event.end,
+      color: event.color,
+      categoryId: event.categoryId,
+      location: event.location,
+    );
+    final updatedEvents = [..._events, duplicate]
+      ..sort((a, b) => a.start.compareTo(b.start));
+    await _persistMutation(
+      updatedEvents,
+      failureMessage: AppLocalizations.of(context).eventCopyError,
+    );
+  }
+
+  Future<void> _setEventCategory(CalendarEvent event, String categoryId) async {
+    final category =
+        EventCategories.byId(categoryId) ?? EventCategories.uncategorized;
+    final updatedEvent = CalendarEvent(
+      id: event.id,
+      title: event.title,
+      start: event.start,
+      end: event.end,
+      color: category.color,
+      categoryId: category.id,
+      location: event.location,
+    );
+    await _changeEventFromGrid(updatedEvent);
+  }
+
+  Future<void> _openEventContextMenu(
+    CalendarEvent event, {
+    required Rect anchorRect,
+    required Offset position,
+  }) async {
+    final selection = await _showEventContextMenu(
       context,
       event,
-      anchorRect: anchorRect,
+      position: position,
     );
-    if (updatedEvent == null || !mounted) {
+    if (selection == null || !mounted) {
       return;
     }
-    await _changeEventFromGrid(updatedEvent);
+    switch (selection.action) {
+      case _EventContextAction.edit:
+        await _editEvent(event, anchorRect: anchorRect);
+        break;
+      case _EventContextAction.copy:
+        await _copyEventFromMenu(event);
+        break;
+      case _EventContextAction.delete:
+        await _deleteEvent(event);
+        break;
+      case _EventContextAction.category:
+        await _setEventCategory(event, selection.categoryId!);
+        break;
+    }
   }
 
   Future<bool> _persistMutation(
@@ -347,7 +402,7 @@ class _WeekScreenState extends State<WeekScreen> {
                                     anchorRect: anchorRect,
                                   ),
                               onEventChanged: _changeEventFromGrid,
-                              onAdjustEvent: _adjustEventTime,
+                              onEventContextMenu: _openEventContextMenu,
                             ),
                             overview: _WeekGridSummary(
                               key: const PageStorageKey('overview-week-view'),
@@ -1080,7 +1135,7 @@ class _WeekHourlyLayout extends StatefulWidget {
     required this.onEventTap,
     required this.onCreateEvent,
     required this.onEventChanged,
-    required this.onAdjustEvent,
+    required this.onEventContextMenu,
   });
 
   final List<DateTime> days;
@@ -1090,7 +1145,7 @@ class _WeekHourlyLayout extends StatefulWidget {
   final _OpenEventCallback onEventTap;
   final _CreateEventCallback onCreateEvent;
   final ValueChanged<CalendarEvent> onEventChanged;
-  final _AdjustEventCallback onAdjustEvent;
+  final _EventContextMenuCallback onEventContextMenu;
 
   @override
   State<_WeekHourlyLayout> createState() => _WeekHourlyLayoutState();
@@ -1846,11 +1901,14 @@ class _WeekHourlyLayoutState extends State<_WeekHourlyLayout> {
                                                 );
                                               },
                                               onSecondaryTap:
-                                                  (anchorRect) async {
-                                                    await widget.onAdjustEvent(
-                                                      originalEvent,
-                                                      anchorRect,
-                                                    );
+                                                  (anchorRect, position) async {
+                                                    await widget
+                                                        .onEventContextMenu(
+                                                          originalEvent,
+                                                          anchorRect:
+                                                              anchorRect,
+                                                          position: position,
+                                                        );
                                                   },
                                               onMoveStart: () =>
                                                   _startMoving(originalEvent),
@@ -2765,7 +2823,7 @@ class _MinuteRule extends StatelessWidget {
   }
 }
 
-class _GridEvent extends StatelessWidget {
+class _GridEvent extends StatefulWidget {
   const _GridEvent({
     super.key,
     required this.eventKey,
@@ -2811,7 +2869,7 @@ class _GridEvent extends StatelessWidget {
   final bool desktopPointers;
   final VoidCallback onFocus;
   final ValueChanged<Rect> onTap;
-  final ValueChanged<Rect> onSecondaryTap;
+  final void Function(Rect anchorRect, Offset position) onSecondaryTap;
   final VoidCallback onMoveStart;
   final ValueChanged<Offset> onMoveUpdate;
   final VoidCallback onMoveEnd;
@@ -2820,6 +2878,73 @@ class _GridEvent extends StatelessWidget {
   final GestureDragUpdateCallback onResizeUpdate;
   final GestureDragEndCallback onResizeEnd;
   final GestureDragCancelCallback onResizeCancel;
+
+  @override
+  State<_GridEvent> createState() => _GridEventState();
+}
+
+class _GridEventState extends State<_GridEvent> {
+  _ResizeEdge? _hoveredResizeEdge;
+  _ResizeEdge? _activeResizeEdge;
+
+  Key get eventKey => widget.eventKey;
+  CalendarEvent get event => widget.event;
+  int get dayIndex => widget.dayIndex;
+  int get lane => widget.lane;
+  int get laneCount => widget.laneCount;
+  double get columnWidth => widget.columnWidth;
+  double get gutterWidth => widget.gutterWidth;
+  _TimelineScale get scale => widget.scale;
+  bool get narrow => widget.narrow;
+  bool get isSelected => widget.isSelected;
+  bool get isManipulating => widget.isManipulating;
+  bool get isResizing => widget.isResizing;
+  bool get allowResize => widget.allowResize;
+  bool get desktopPointers => widget.desktopPointers;
+  VoidCallback get onFocus => widget.onFocus;
+  ValueChanged<Rect> get onTap => widget.onTap;
+  void Function(Rect, Offset) get onSecondaryTap => widget.onSecondaryTap;
+  VoidCallback get onMoveStart => widget.onMoveStart;
+  ValueChanged<Offset> get onMoveUpdate => widget.onMoveUpdate;
+  VoidCallback get onMoveEnd => widget.onMoveEnd;
+  VoidCallback get onMoveCancel => widget.onMoveCancel;
+  ValueChanged<_ResizeEdge> get onResizeStart => widget.onResizeStart;
+  GestureDragUpdateCallback get onResizeUpdate => widget.onResizeUpdate;
+  GestureDragEndCallback get onResizeEnd => widget.onResizeEnd;
+  GestureDragCancelCallback get onResizeCancel => widget.onResizeCancel;
+
+  _ResizeEdge? _edgeAt(
+    Offset position, {
+    required double bodyOffset,
+    required double bodyHeight,
+  }) {
+    if (!allowResize) {
+      return null;
+    }
+    final bodyEnd = bodyOffset + bodyHeight;
+    if (position.dy < bodyOffset - 4 || position.dy > bodyEnd + 4) {
+      return null;
+    }
+    if (bodyHeight <= 18) {
+      return position.dy <= bodyOffset + bodyHeight / 2
+          ? _ResizeEdge.start
+          : _ResizeEdge.end;
+    }
+    if (position.dy <= bodyOffset + 8) {
+      return _ResizeEdge.start;
+    }
+    if (position.dy >= bodyEnd - 8) {
+      return _ResizeEdge.end;
+    }
+    return null;
+  }
+
+  void _setHoveredEdge(_ResizeEdge? edge) {
+    if (_hoveredResizeEdge == edge || _activeResizeEdge != null) {
+      return;
+    }
+    setState(() => _hoveredResizeEdge = edge);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -2831,14 +2956,11 @@ class _GridEvent extends StatelessWidget {
       scale.rangeTouchesFocus(visibleStart, visibleEnd) ? 14.0 : 5.0,
       rawHeight - 2,
     );
-    final showResizeHandles = allowResize && isSelected && !isManipulating;
-    final handlePadding = showResizeHandles
-        ? 12.0
-        : math.max(0.0, (24.0 - bodyHeight) / 2);
+    final hitPadding = math.max(0.0, (24.0 - bodyHeight) / 2);
     final desiredBodyTop = top + 1;
-    final positionedTop = math.max(0.0, desiredBodyTop - handlePadding);
+    final positionedTop = math.max(0.0, desiredBodyTop - hitPadding);
     final bodyOffset = desiredBodyTop - positionedTop;
-    final trailingPadding = showResizeHandles ? 12.0 : handlePadding;
+    final trailingPadding = hitPadding;
     final outerHeight = math.max(
       24.0,
       bodyOffset + bodyHeight + trailingPadding,
@@ -2892,9 +3014,23 @@ class _GridEvent extends StatelessWidget {
                 curve: WeekraMotion.standard,
                 child: Builder(
                   builder: (eventContext) => MouseRegion(
-                    cursor: desktopPointers
+                    cursor: !desktopPointers
+                        ? MouseCursor.defer
+                        : _hoveredResizeEdge == null
                         ? SystemMouseCursors.move
-                        : MouseCursor.defer,
+                        : SystemMouseCursors.resizeUpDown,
+                    onHover: desktopPointers
+                        ? (event) => _setHoveredEdge(
+                            _edgeAt(
+                              event.localPosition,
+                              bodyOffset: bodyOffset,
+                              bodyHeight: bodyHeight,
+                            ),
+                          )
+                        : null,
+                    onExit: desktopPointers
+                        ? (_) => _setHoveredEdge(null)
+                        : null,
                     child: GestureDetector(
                       key: eventKey,
                       behavior: HitTestBehavior.opaque,
@@ -2919,14 +3055,64 @@ class _GridEvent extends StatelessWidget {
                                     width: 1,
                                     height: 1,
                                   ),
+                              details.globalPosition,
                             )
                           : null,
-                      onPanStart: desktopPointers ? (_) => onMoveStart() : null,
-                      onPanUpdate: desktopPointers
-                          ? (details) => onMoveUpdate(details.globalPosition)
+                      onPanStart: desktopPointers
+                          ? (details) {
+                              final edge = _edgeAt(
+                                details.localPosition,
+                                bodyOffset: bodyOffset,
+                                bodyHeight: bodyHeight,
+                              );
+                              setState(() {
+                                _activeResizeEdge = edge;
+                                _hoveredResizeEdge = edge;
+                              });
+                              if (edge == null) {
+                                onMoveStart();
+                              } else {
+                                onResizeStart(edge);
+                              }
+                            }
                           : null,
-                      onPanEnd: desktopPointers ? (_) => onMoveEnd() : null,
-                      onPanCancel: desktopPointers ? onMoveCancel : null,
+                      onPanUpdate: desktopPointers
+                          ? (details) {
+                              if (_activeResizeEdge == null) {
+                                onMoveUpdate(details.globalPosition);
+                              } else {
+                                onResizeUpdate(details);
+                              }
+                            }
+                          : null,
+                      onPanEnd: desktopPointers
+                          ? (details) {
+                              final edge = _activeResizeEdge;
+                              setState(() {
+                                _activeResizeEdge = null;
+                                _hoveredResizeEdge = null;
+                              });
+                              if (edge == null) {
+                                onMoveEnd();
+                              } else {
+                                onResizeEnd(details);
+                              }
+                            }
+                          : null,
+                      onPanCancel: desktopPointers
+                          ? () {
+                              final edge = _activeResizeEdge;
+                              setState(() {
+                                _activeResizeEdge = null;
+                                _hoveredResizeEdge = null;
+                              });
+                              if (edge == null) {
+                                onMoveCancel();
+                              } else {
+                                onResizeCancel();
+                              }
+                            }
+                          : null,
                       onLongPressStart: desktopPointers
                           ? null
                           : (_) => onMoveStart(),
@@ -2970,8 +3156,6 @@ class _GridEvent extends StatelessWidget {
                             verticalPadding,
                             isTiny
                                 ? 1
-                                : isSelected
-                                ? 16
                                 : narrow
                                 ? 4
                                 : 6,
@@ -3024,40 +3208,31 @@ class _GridEvent extends StatelessWidget {
               ),
             ),
           ),
-          if (isSelected && !isManipulating && laneWidth >= 42)
+          if (_hoveredResizeEdge case final edge?)
             PositionedDirectional(
-              top: bodyOffset + 4,
-              end: 4,
+              key: Key('event-resize-edge-${event.id}'),
+              start: 5,
+              end: 5,
+              top: edge == _ResizeEdge.start ? bodyOffset : null,
+              bottom: edge == _ResizeEdge.end
+                  ? math.max(0, outerHeight - bodyOffset - bodyHeight)
+                  : null,
+              height: 2,
               child: IgnorePointer(
-                child: Icon(
-                  Icons.drag_indicator_rounded,
-                  size: 12,
-                  color: _ink.withValues(alpha: 0.72),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: event.color.withValues(alpha: .82),
+                    borderRadius: BorderRadius.circular(2),
+                    boxShadow: [
+                      BoxShadow(
+                        color: event.color.withValues(alpha: .38),
+                        blurRadius: 4,
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
-          if (showResizeHandles) ...[
-            _GridResizeHandle(
-              key: Key('event-resize-start-${event.id}'),
-              edge: _ResizeEdge.start,
-              color: event.color,
-              semanticLabel: AppLocalizations.of(context).resizeEventStart,
-              onStart: onResizeStart,
-              onUpdate: onResizeUpdate,
-              onEnd: onResizeEnd,
-              onCancel: onResizeCancel,
-            ),
-            _GridResizeHandle(
-              key: Key('event-resize-end-${event.id}'),
-              edge: _ResizeEdge.end,
-              color: event.color,
-              semanticLabel: AppLocalizations.of(context).resizeEventEnd,
-              onStart: onResizeStart,
-              onUpdate: onResizeUpdate,
-              onEnd: onResizeEnd,
-              onCancel: onResizeCancel,
-            ),
-          ],
         ],
       ),
     );
@@ -3335,7 +3510,7 @@ class _GridDraftEvent extends StatelessWidget {
   }
 }
 
-class _GridResizeHandle extends StatelessWidget {
+class _GridResizeHandle extends StatefulWidget {
   const _GridResizeHandle({
     super.key,
     required this.edge,
@@ -3356,35 +3531,51 @@ class _GridResizeHandle extends StatelessWidget {
   final GestureDragCancelCallback onCancel;
 
   @override
+  State<_GridResizeHandle> createState() => _GridResizeHandleState();
+}
+
+class _GridResizeHandleState extends State<_GridResizeHandle> {
+  bool _hovered = false;
+
+  @override
   Widget build(BuildContext context) {
     return PositionedDirectional(
       start: 0,
       end: 0,
-      top: edge == _ResizeEdge.start ? 0 : null,
-      bottom: edge == _ResizeEdge.end ? 0 : null,
+      top: widget.edge == _ResizeEdge.start ? 0 : null,
+      bottom: widget.edge == _ResizeEdge.end ? 0 : null,
       height: 24,
       child: Semantics(
         slider: true,
-        label: semanticLabel,
+        label: widget.semanticLabel,
         child: MouseRegion(
           cursor: SystemMouseCursors.resizeUpDown,
+          onEnter: (_) => setState(() => _hovered = true),
+          onExit: (_) => setState(() => _hovered = false),
           child: GestureDetector(
             behavior: HitTestBehavior.translucent,
-            onVerticalDragStart: (_) => onStart(edge),
-            onVerticalDragUpdate: onUpdate,
-            onVerticalDragEnd: onEnd,
-            onVerticalDragCancel: onCancel,
+            onVerticalDragStart: (_) => widget.onStart(widget.edge),
+            onVerticalDragUpdate: widget.onUpdate,
+            onVerticalDragEnd: widget.onEnd,
+            onVerticalDragCancel: widget.onCancel,
             child: Center(
-              child: Container(
-                width: 18,
-                height: 7,
+              child: AnimatedContainer(
+                duration: WeekraMotion.resolve(context, WeekraMotion.quick),
+                width: _hovered ? 28 : 18,
+                height: 2,
                 decoration: BoxDecoration(
-                  color: _ink,
-                  borderRadius: BorderRadius.circular(5),
-                  border: Border.all(color: color, width: 2),
-                  boxShadow: const [
-                    BoxShadow(color: Color(0x66000000), blurRadius: 4),
-                  ],
+                  color: _hovered
+                      ? widget.color.withValues(alpha: .86)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(2),
+                  boxShadow: _hovered
+                      ? [
+                          BoxShadow(
+                            color: widget.color.withValues(alpha: .34),
+                            blurRadius: 4,
+                          ),
+                        ]
+                      : null,
                 ),
               ),
             ),
@@ -4124,129 +4315,140 @@ PopupMenuItem<String> _categoryMenuItem(
   );
 }
 
-class _TimeRangeFields extends StatelessWidget {
-  const _TimeRangeFields({
-    required this.startTime,
-    required this.endTime,
-    required this.onStartPressed,
-    required this.onEndPressed,
-  });
-
-  final TimeOfDay startTime;
-  final TimeOfDay endTime;
-  final VoidCallback onStartPressed;
-  final VoidCallback onEndPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    Widget button(TimeOfDay time, VoidCallback onPressed) {
-      return OutlinedButton.icon(
-        onPressed: onPressed,
-        icon: const Icon(Icons.schedule_rounded, size: 18),
-        label: Text(
-          MaterialLocalizations.of(context).formatTimeOfDay(
-            time,
-            alwaysUse24HourFormat: MediaQuery.alwaysUse24HourFormatOf(context),
-          ),
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          textAlign: TextAlign.center,
-        ),
-      );
-    }
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final scaledBody = MediaQuery.textScalerOf(context).scale(16);
-        final shouldStack = constraints.maxWidth < 330 || scaledBody > 21;
-        if (shouldStack) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              button(startTime, onStartPressed),
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 4),
-                child: Icon(Icons.arrow_downward_rounded, size: 18),
-              ),
-              button(endTime, onEndPressed),
-            ],
-          );
-        }
-        return Row(
-          children: [
-            Expanded(child: button(startTime, onStartPressed)),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 9),
-              child: Icon(Icons.arrow_forward_rounded, size: 18),
-            ),
-            Expanded(child: button(endTime, onEndPressed)),
-          ],
-        );
-      },
-    );
-  }
-}
-
-class _EditorActions extends StatelessWidget {
-  const _EditorActions({required this.saveLabel, required this.onSave});
-
-  final String saveLabel;
-  final VoidCallback onSave;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-
-    Widget cancelButton() => OutlinedButton(
-      key: const Key('cancel-event-editor'),
-      onPressed: () => Navigator.of(context).pop(),
-      child: Text(
-        l10n.cancel,
-        maxLines: 2,
-        overflow: TextOverflow.ellipsis,
-        textAlign: TextAlign.center,
-      ),
-    );
-
-    Widget saveButton() => FilledButton(
-      key: const Key('save-event'),
-      onPressed: onSave,
-      child: Text(
-        saveLabel,
-        maxLines: 2,
-        overflow: TextOverflow.ellipsis,
-        textAlign: TextAlign.center,
-      ),
-    );
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final shouldStack =
-            constraints.maxWidth < 330 ||
-            MediaQuery.textScalerOf(context).scale(16) > 21;
-        if (shouldStack) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              saveButton(),
-              const SizedBox(height: 10),
-              cancelButton(),
-            ],
-          );
-        }
-        return Row(
-          children: [
-            Expanded(child: cancelButton()),
-            const SizedBox(width: 10),
-            Expanded(flex: 2, child: saveButton()),
-          ],
-        );
-      },
-    );
-  }
-}
-
 enum _EventAction { edit, delete }
+
+enum _EventContextAction { edit, copy, delete, category }
+
+class _EventContextSelection {
+  const _EventContextSelection(this.action, {this.categoryId});
+
+  final _EventContextAction action;
+  final String? categoryId;
+}
+
+Future<_EventContextSelection?> _showEventContextMenu(
+  BuildContext context,
+  CalendarEvent event, {
+  required Offset position,
+}) {
+  final l10n = AppLocalizations.of(context);
+  final overlay = Overlay.of(context).context.findRenderObject()! as RenderBox;
+  final localPosition = overlay.globalToLocal(position);
+  final menuPosition = RelativeRect.fromLTRB(
+    localPosition.dx,
+    localPosition.dy,
+    overlay.size.width - localPosition.dx,
+    overlay.size.height - localPosition.dy,
+  );
+
+  PopupMenuItem<_EventContextSelection> actionItem({
+    required Key key,
+    required _EventContextAction action,
+    required IconData icon,
+    required String label,
+    Color? color,
+  }) {
+    return PopupMenuItem<_EventContextSelection>(
+      key: key,
+      value: _EventContextSelection(action),
+      height: 42,
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: color ?? _mutedInk),
+          const SizedBox(width: 11),
+          Text(label, style: TextStyle(color: color ?? _ink, fontSize: 13)),
+        ],
+      ),
+    );
+  }
+
+  PopupMenuItem<_EventContextSelection> categoryItem(EventCategory category) {
+    final selected = event.categoryId == category.id;
+    return PopupMenuItem<_EventContextSelection>(
+      key: Key('event-context-category-${category.id}'),
+      value: _EventContextSelection(
+        _EventContextAction.category,
+        categoryId: category.id,
+      ),
+      height: 38,
+      child: Row(
+        children: [
+          Container(
+            width: 10,
+            height: 10,
+            decoration: BoxDecoration(
+              color: category.color,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 11),
+          Expanded(
+            child: Text(
+              _categoryName(l10n, category.id),
+              style: const TextStyle(color: _ink, fontSize: 13),
+            ),
+          ),
+          if (selected)
+            Icon(
+              Icons.check_rounded,
+              size: 17,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+        ],
+      ),
+    );
+  }
+
+  return showMenu<_EventContextSelection>(
+    context: context,
+    position: menuPosition,
+    color: WeekraColors.surfaceRaised.withValues(alpha: .98),
+    surfaceTintColor: Colors.transparent,
+    elevation: 14,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(14),
+      side: const BorderSide(color: WeekraColors.outline),
+    ),
+    constraints: const BoxConstraints(minWidth: 210, maxWidth: 250),
+    items: [
+      actionItem(
+        key: const Key('event-context-edit'),
+        action: _EventContextAction.edit,
+        icon: Icons.edit_outlined,
+        label: l10n.edit,
+      ),
+      actionItem(
+        key: const Key('event-context-copy'),
+        action: _EventContextAction.copy,
+        icon: Icons.content_copy_rounded,
+        label: l10n.copy,
+      ),
+      actionItem(
+        key: const Key('event-context-delete'),
+        action: _EventContextAction.delete,
+        icon: Icons.delete_outline_rounded,
+        label: l10n.delete,
+        color: Theme.of(context).colorScheme.error,
+      ),
+      const PopupMenuDivider(height: 9),
+      PopupMenuItem<_EventContextSelection>(
+        key: const Key('event-context-category-heading'),
+        enabled: false,
+        height: 30,
+        child: Text(
+          l10n.categorySection,
+          style: const TextStyle(
+            color: _tertiaryInk,
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+      categoryItem(EventCategories.uncategorized),
+      for (final category in EventCategories.values) categoryItem(category),
+    ],
+  );
+}
 
 class _EventDetailsSheet extends StatelessWidget {
   const _EventDetailsSheet({required this.event, this.floating = false});
@@ -4422,179 +4624,6 @@ class _EventActionButtons extends StatelessWidget {
           ],
         );
       },
-    );
-  }
-}
-
-class _EventTimeAdjustCard extends StatefulWidget {
-  const _EventTimeAdjustCard({required this.event});
-
-  final CalendarEvent event;
-
-  @override
-  State<_EventTimeAdjustCard> createState() => _EventTimeAdjustCardState();
-}
-
-class _EventTimeAdjustCardState extends State<_EventTimeAdjustCard> {
-  late int _startMinute;
-  late int _endMinute;
-
-  int get _duration => _endMinute - _startMinute;
-
-  @override
-  void initState() {
-    super.initState();
-    _startMinute = widget.event.startMinutes.clamp(0, 23 * 60 + 30).toInt();
-    _endMinute = (_startMinute + widget.event.durationMinutes)
-        .clamp(_startMinute + _minimumEventMinutes, _maximumAdjustMinute)
-        .toInt();
-  }
-
-  Future<void> _pickTime({required bool start}) async {
-    final minute = start ? _startMinute : _endMinute;
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: _timeOfDayAt(minute % (24 * 60)),
-    );
-    if (picked == null || !mounted) {
-      return;
-    }
-    final pickedMinute = picked.hour * 60 + picked.minute;
-    setState(() {
-      if (start) {
-        final previousDuration = _duration;
-        _startMinute = pickedMinute.clamp(0, 23 * 60 + 30).toInt();
-        _endMinute = (_startMinute + previousDuration)
-            .clamp(_startMinute + _minimumEventMinutes, _maximumAdjustMinute)
-            .toInt();
-      } else {
-        final adjustedMinute = pickedMinute <= _startMinute
-            ? pickedMinute + 24 * 60
-            : pickedMinute;
-        _endMinute = adjustedMinute
-            .clamp(_startMinute + _minimumEventMinutes, _maximumAdjustMinute)
-            .toInt();
-      }
-    });
-  }
-
-  void _changeDuration(int delta) {
-    setState(() {
-      _endMinute = (_endMinute + delta)
-          .clamp(_startMinute + _minimumEventMinutes, _maximumAdjustMinute)
-          .toInt();
-    });
-    HapticFeedback.selectionClick();
-  }
-
-  void _save() {
-    final day = DateTime(
-      widget.event.start.year,
-      widget.event.start.month,
-      widget.event.start.day,
-    );
-    Navigator.of(context).pop(
-      _copyEvent(
-        widget.event,
-        start: _dateAtMinute(day, _startMinute),
-        end: _dateAtMinute(day, _endMinute),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    return SingleChildScrollView(
-      key: const Key('adjust-time-card'),
-      padding: const EdgeInsetsDirectional.fromSTEB(22, 18, 22, 22),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  l10n.adjustEventTimeTitle,
-                  style: const TextStyle(
-                    color: _ink,
-                    fontSize: 21,
-                    height: 1.2,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              IconButton(
-                onPressed: () => Navigator.of(context).pop(),
-                tooltip: l10n.closeTooltip,
-                icon: const Icon(Icons.close_rounded),
-              ),
-            ],
-          ),
-          const SizedBox(height: 5),
-          Text(
-            widget.event.title,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(color: _mutedInk, fontSize: 13),
-          ),
-          const SizedBox(height: 20),
-          Text(l10n.timeSection, style: _fieldLabelStyle),
-          const SizedBox(height: 8),
-          _TimeRangeFields(
-            startTime: _timeOfDayAt(_startMinute),
-            endTime: _timeOfDayAt(_endMinute % (24 * 60)),
-            onStartPressed: () => _pickTime(start: true),
-            onEndPressed: () => _pickTime(start: false),
-          ),
-          const SizedBox(height: 18),
-          Text(l10n.durationSection, style: _fieldLabelStyle),
-          const SizedBox(height: 8),
-          Container(
-            height: 44,
-            decoration: BoxDecoration(
-              color: WeekraColors.surfaceRaised.withValues(alpha: 0.8),
-              borderRadius: BorderRadius.circular(WeekraMetrics.controlRadius),
-              border: Border.all(color: WeekraColors.outline),
-            ),
-            child: Row(
-              children: [
-                IconButton(
-                  key: const Key('decrease-event-duration'),
-                  onPressed: _duration <= _minimumEventMinutes
-                      ? null
-                      : () => _changeDuration(-_gridSnapMinutes),
-                  tooltip: l10n.decreaseDurationTooltip,
-                  icon: const Icon(Icons.remove_rounded),
-                ),
-                Expanded(
-                  child: Text(
-                    l10n.durationMinutes(_duration),
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: _ink,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      fontFeatures: [FontFeature.tabularFigures()],
-                    ),
-                  ),
-                ),
-                IconButton(
-                  key: const Key('increase-event-duration'),
-                  onPressed: _endMinute >= 23 * 60 + 45
-                      ? null
-                      : () => _changeDuration(_gridSnapMinutes),
-                  tooltip: l10n.increaseDurationTooltip,
-                  icon: const Icon(Icons.add_rounded),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 22),
-          _EditorActions(saveLabel: l10n.saveChanges, onSave: _save),
-        ],
-      ),
     );
   }
 }
@@ -4779,20 +4808,6 @@ Future<CalendarEvent?> _showEventEditorSheet(
   );
 }
 
-Future<CalendarEvent?> _showEventTimeAdjustCard(
-  BuildContext context,
-  CalendarEvent event, {
-  required Rect anchorRect,
-}) {
-  return _showAnchoredCard<CalendarEvent>(
-    context,
-    anchorRect: anchorRect,
-    maxWidth: 390,
-    maxHeight: 470,
-    builder: (context) => _EventTimeAdjustCard(event: event),
-  );
-}
-
 Future<T?> _showAnchoredCard<T>(
   BuildContext context, {
   required Rect anchorRect,
@@ -4846,11 +4861,6 @@ Rect? _globalRectFor(BuildContext? context) {
   return renderObject.localToGlobal(Offset.zero) & renderObject.size;
 }
 
-TimeOfDay _timeOfDayAt(int minute) {
-  final safeMinute = minute.clamp(0, 23 * 60 + 59).toInt();
-  return TimeOfDay(hour: safeMinute ~/ 60, minute: safeMinute % 60);
-}
-
 DateTime _atTime(DateTime date, TimeOfDay time) {
   return DateTime(date.year, date.month, date.day, time.hour, time.minute);
 }
@@ -4898,14 +4908,6 @@ String _categoryName(AppLocalizations l10n, String categoryId) {
     _ => l10n.uncategorized,
   };
 }
-
-const _fieldLabelStyle = TextStyle(
-  color: _mutedInk,
-  fontSize: 10,
-  height: 1.2,
-  fontWeight: FontWeight.w700,
-  letterSpacing: 1.3,
-);
 
 DateTime _centeredTimelineStart(DateTime date) {
   final day = DateTime(date.year, date.month, date.day);

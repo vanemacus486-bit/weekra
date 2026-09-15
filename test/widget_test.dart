@@ -445,7 +445,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('preserves an overnight event through the time adjustment card', (
+  testWidgets('copies an overnight event from its continuation menu', (
     tester,
   ) async {
     _useViewport(tester, const Size(1280, 800));
@@ -470,15 +470,22 @@ void main() {
       buttons: kSecondaryMouseButton,
     );
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('adjust-time-card')), findsOneWidget);
-
-    await tester.tap(find.byKey(const Key('save-event')));
+    expect(find.byKey(const Key('event-context-copy')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('event-context-copy')));
     await tester.pumpAndSettle();
-    expect(store.savedEvents.single.durationMinutes, 180);
+    expect(store.savedEvents, hasLength(2));
     expect(
-      store.savedEvents.single.end.day,
-      isNot(store.savedEvents.single.start.day),
+      store.savedEvents.map((event) => event.durationMinutes),
+      everyElement(180),
     );
+    expect(
+      store.savedEvents.map((event) => event.title),
+      everyElement(overnight.title),
+    );
+    expect(store.savedEvents[0].id, isNot(store.savedEvents[1].id));
+    for (final event in store.savedEvents) {
+      expect(event.end.day, isNot(event.start.day));
+    }
     _restoreTestPlatform();
   });
 
@@ -889,7 +896,7 @@ void main() {
     _restoreTestPlatform();
   });
 
-  testWidgets('right click opens a bounded time adjustment card', (
+  testWidgets('right click opens a bounded action and category menu', (
     tester,
   ) async {
     _useViewport(tester, const Size(900, 760));
@@ -911,18 +918,28 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    final card = find.byKey(const Key('adjust-time-card'));
-    expect(card, findsOneWidget);
-    final cardRect = tester.getRect(card);
-    expect(cardRect.left, greaterThanOrEqualTo(0));
-    expect(cardRect.right, lessThanOrEqualTo(900));
-    expect(cardRect.top, greaterThanOrEqualTo(0));
-    expect(cardRect.bottom, lessThanOrEqualTo(760));
+    final edit = find.byKey(const Key('event-context-edit'));
+    final copy = find.byKey(const Key('event-context-copy'));
+    final delete = find.byKey(const Key('event-context-delete'));
+    final lastCategory = find.byKey(
+      const Key('event-context-category-category-6'),
+    );
+    expect(edit, findsOneWidget);
+    expect(copy, findsOneWidget);
+    expect(delete, findsOneWidget);
+    expect(lastCategory, findsOneWidget);
+    expect(tester.getRect(edit).top, greaterThanOrEqualTo(0));
+    expect(tester.getRect(lastCategory).bottom, lessThanOrEqualTo(760));
 
-    await tester.tap(find.byKey(const Key('increase-event-duration')));
-    await tester.tap(find.byKey(const Key('save-event')));
+    await tester.tap(
+      find.byKey(const Key('event-context-category-category-3')),
+    );
     await tester.pumpAndSettle();
-    expect(store.savedEvents.single.durationMinutes, 75);
+    expect(store.savedEvents.single.categoryId, 'category-3');
+    expect(
+      store.savedEvents.single.color,
+      EventCategories.colorFor('category-3'),
+    );
     _restoreTestPlatform();
   });
 
@@ -953,8 +970,11 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('stretches a selected event from its end handle', (tester) async {
+  testWidgets('resizes directly from an event edge without visible handles', (
+    tester,
+  ) async {
     _useViewport(tester, const Size(900, 1000));
+    _useDesktopPlatform();
     final original = _eventAtStartOfWeek('Resize me');
     final store = _MemoryEventStore([original]);
     await tester.pumpWidget(
@@ -966,14 +986,14 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const Key('hourly-event-Resize me')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byIcon(Icons.close_rounded).last);
-    await tester.pumpAndSettle();
-    final endHandle = find.byKey(const Key('event-resize-end-Resize me'));
-    expect(endHandle, findsOneWidget);
+    expect(find.byIcon(Icons.drag_indicator_rounded), findsNothing);
+    expect(find.byKey(const Key('event-resize-end-Resize me')), findsNothing);
+    final surface = tester.getRect(
+      find.byKey(const Key('hourly-event-surface-Resize me-0')),
+    );
     final resizeGesture = await tester.startGesture(
-      tester.getCenter(endHandle),
+      Offset(surface.center.dx, surface.bottom - 2),
+      kind: PointerDeviceKind.mouse,
     );
     await resizeGesture.moveBy(const Offset(0, 20));
     await tester.pump();
@@ -985,6 +1005,7 @@ void main() {
     expect(store.savedEvents.single.start, original.start);
     expect(store.savedEvents.single.end.isAfter(original.end), isTrue);
     expect(store.savedEvents.single.end.minute % 15, 0);
+    _restoreTestPlatform();
   });
 
   testWidgets('edits an existing event', (tester) async {
@@ -1018,6 +1039,7 @@ void main() {
   });
 
   testWidgets('deletes an existing event after confirmation', (tester) async {
+    _useDesktopPlatform();
     final store = _MemoryEventStore([_event('Remove me')]);
     await tester.pumpWidget(
       WeekraApp(
@@ -1028,9 +1050,12 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Remove me').hitTestable());
+    await tester.tap(
+      find.byKey(const Key('hourly-event-Remove me')),
+      buttons: kSecondaryMouseButton,
+    );
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('delete-event')));
+    await tester.tap(find.byKey(const Key('event-context-delete')));
     await tester.pumpAndSettle();
 
     expect(find.text('Delete event?'), findsOneWidget);
@@ -1039,6 +1064,7 @@ void main() {
 
     expect(store.savedEvents, isEmpty);
     expect(find.text('Remove me'), findsNothing);
+    _restoreTestPlatform();
   });
 
   testWidgets('supports Simplified Chinese throughout the event flow', (
