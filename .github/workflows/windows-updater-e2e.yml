@@ -72,6 +72,12 @@ jobs:
           if (-not $changed) {
             Get-ChildItem "$env:LOCALAPPDATA/Weekra/Logs" -Filter update.log -Recurse -ErrorAction SilentlyContinue |
               ForEach-Object { Get-Content $_.FullName }
+            Get-ChildItem "$env:TEMP" -Filter 'weekra-update-*' -Directory -ErrorAction SilentlyContinue |
+              Get-ChildItem -File -ErrorAction SilentlyContinue |
+              ForEach-Object {
+                Write-Host "--- $($_.FullName)"
+                if ($_.Extension -in '.ps1', '.log') { Get-Content $_.FullName }
+              }
             throw 'The installed Weekra executable was never replaced.'
           }
 
@@ -99,13 +105,22 @@ jobs:
             throw 'The persistent update log did not record success.'
           }
 
+      - name: Collect updater logs
+        if: always()
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path updater-logs -Force | Out-Null
+          Copy-Item "$env:RUNNER_TEMP/weekra-update-smoke.log" updater-logs -ErrorAction SilentlyContinue
+          Copy-Item "$env:LOCALAPPDATA/Weekra/Logs/*" updater-logs -ErrorAction SilentlyContinue
+          Get-ChildItem "$env:TEMP" -Filter 'weekra-update-*' -Directory -ErrorAction SilentlyContinue |
+            Get-ChildItem -File -ErrorAction SilentlyContinue |
+            Copy-Item -Destination updater-logs -ErrorAction SilentlyContinue
+
       - name: Upload updater log
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: weekra-update-log
-          path: |
-            ${{ runner.temp }}/weekra-update-smoke.log
-            ~/AppData/Local/Weekra/Logs/update.log
+          path: updater-logs
           if-no-files-found: warn
           retention-days: 14

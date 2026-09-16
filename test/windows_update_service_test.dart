@@ -10,10 +10,12 @@ void main() {
       executablePath:
           r'C:\Users\test\AppData\Local\Programs\Weekra\weekra.exe',
       logPath: r'C:\Temp\update.log',
+      readyPath: r'C:\Temp\installer-ready',
       appProcessId: 4242,
     );
 
     expect(script, contains(r'$appPid = 4242'));
+    expect(script, contains(r"New-Item -ItemType File -Path $ready -Force"));
     expect(script, contains(r'Wait-Process -Id $appPid'));
     expect(script, isNot(contains(r'Wait-Process -Id $pid')));
     expect(
@@ -24,6 +26,7 @@ void main() {
     expect(script, contains(r'/VERYSILENT'));
     expect(script, contains(r'/SUPPRESSMSGBOXES'));
     expect(script, contains(r'/NORESTART'));
+    expect(script, contains(r'''('/LOG="' + $log + '.installer"')'''));
     expect(script, contains(r'$process.ExitCode -ne 0'));
     expect(script, contains('Update installed successfully.'));
     expect(script, contains('Update installation failed.'));
@@ -37,6 +40,7 @@ void main() {
       installDirectory: r"C:\Users\O'Brien\Weekra",
       executablePath: r"C:\Users\O'Brien\Weekra\weekra.exe",
       logPath: r'C:\Temp\update.log',
+      readyPath: r'C:\Temp\installer-ready',
       appProcessId: 7,
     );
 

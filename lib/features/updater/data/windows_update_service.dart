@@ -187,15 +187,17 @@ class WindowsUpdateService implements UpdateService {
     final installDirectory = executable.parent.path;
     final logPath = (await _diagnosticFile()).path;
     final script = File('${workDirectory.path}\\install-update.ps1');
+    final ready = File('${workDirectory.path}\\installer-ready');
     final scriptContents = buildWindowsInstallerScript(
       installerPath: installer.path,
       installDirectory: installDirectory,
       executablePath: executable.path,
       logPath: logPath,
+      readyPath: ready.path,
       appProcessId: pid,
     );
     await script.writeAsString(scriptContents, flush: true);
-    await Process.start(
+    final helper = await Process.start(
       'powershell.exe',
       [
         '-NoProfile',
@@ -209,6 +211,17 @@ class WindowsUpdateService implements UpdateService {
       ],
       mode: ProcessStartMode.detached,
     );
+    for (var attempt = 0; attempt < 100 && !await ready.exists(); attempt++) {
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    }
+    if (!await ready.exists()) {
+      helper.kill();
+      throw ProcessException(
+        'powershell.exe',
+        <String>[],
+        'The update installer did not acknowledge the handoff.',
+      );
+    }
     exit(0);
   }
 
@@ -287,6 +300,7 @@ String buildWindowsInstallerScript({
   required String installDirectory,
   required String executablePath,
   required String logPath,
+  required String readyPath,
   required int appProcessId,
 }) {
   String literal(String value) => value.replaceAll("'", "''");
@@ -297,10 +311,12 @@ String buildWindowsInstallerScript({
 \$install = '${literal(installDirectory)}'
 \$executable = '${literal(executablePath)}'
 \$log = '${literal(logPath)}'
+\$ready = '${literal(readyPath)}'
 \$appPid = $appProcessId
 
 try {
   "[\$(Get-Date -Format o)] Waiting for Weekra process \$appPid." | Out-File -LiteralPath \$log -Encoding UTF8
+  New-Item -ItemType File -Path \$ready -Force | Out-Null
   Wait-Process -Id \$appPid -ErrorAction SilentlyContinue
   \$arguments = @(
     '/VERYSILENT'
@@ -308,6 +324,7 @@ try {
     '/NORESTART'
     '/SP-'
     ('/DIR="' + \$install + '"')
+    ('/LOG="' + \$log + '.installer"')
   )
   \$process = Start-Process -FilePath \$installer -ArgumentList \$arguments -Wait -PassThru
   if (\$process.ExitCode -ne 0) {

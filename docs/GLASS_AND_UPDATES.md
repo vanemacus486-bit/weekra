@@ -58,7 +58,10 @@ installer results are appended to
 `%LOCALAPPDATA%\Weekra\Logs\update.log` without relying on a Flutter plugin.
 
 The detached PowerShell installer receives Weekra's process ID explicitly and
-waits for that process before replacing files. Do not use PowerShell's `$PID`
+must create a ready marker before Weekra exits. That handshake prevents the app
+from closing before the detached installer has actually taken ownership of the
+update. The helper then waits for Weekra's process before replacing files. Do
+not use PowerShell's `$PID`
 for this wait: variable names are case-insensitive and `$PID` always identifies
 the PowerShell host itself, which would deadlock the update indefinitely.
 
