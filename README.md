@@ -75,7 +75,8 @@ The first UI slice is in place:
 - Offline JSON persistence in the app documents directory
 - Event detail, editing, and confirmed deletion flows
 - System-driven English and Simplified Chinese UI
-- Centered glass settings card with instant theme/language changes and update status
+- Centered glass settings card with instant calendar anchoring, category
+  names/colors, theme/language changes, and update status
 - Pseudo-localization plus small-screen and large-type layout tests
 
 Direct event manipulation uses 15-minute snapping, tactile feedback, and live

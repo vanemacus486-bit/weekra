@@ -86,6 +86,29 @@
   "seedEveningWalk": "晚间散步",
   "settingsTooltip": "设置",
   "settingsTitle": "设置",
+  "settingsCalendar": "日历",
+  "settingsCalendarDescription": "设置七天时间轴的排列方式。",
+  "settingsCategories": "分类",
+  "settingsCategoriesDescription": "修改分类名称和对应颜色。",
+  "settingsCalendarArrangement": "一周排列",
+  "settingsCalendarArrangementDescription": "可以把今天固定在指定列，也可以让每一周从固定星期开始。",
+  "settingsAnchorToday": "定位今天",
+  "settingsAnchorWeekStart": "固定周起点",
+  "settingsTodayPosition": "今天的位置",
+  "settingsTodayPositionDescription": "选择今天显示在七列中的哪一列。",
+  "settingsColumnNumber": "第 {column} 列",
+  "@settingsColumnNumber": {
+    "placeholders": {
+      "column": {
+        "type": "int"
+      }
+    }
+  },
+  "settingsWeekStartsOn": "每周起始日",
+  "settingsWeekStartsOnDescription": "七天视图始终从这个星期开始。",
+  "settingsEditCategory": "编辑分类",
+  "settingsCategoryName": "分类名称",
+  "settingsCategoryColor": "分类颜色",
   "settingsAppearance": "外观",
   "settingsLanguage": "语言",
   "themeEmber": "余烬",

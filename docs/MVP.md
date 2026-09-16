@@ -49,6 +49,8 @@ illustrations, written copy, or other protected brand assets.
   bottom edge and drag when the resize cursor appears to change its length.
 - Right-click an event for direct edit, copy, delete, and category actions.
 - Press Escape to cancel the current draft, move, resize, or floating card.
+- In Settings, keep today in any of the seven columns or align the view to a
+  chosen weekday; category names and colors can also be changed locally.
 
 Touch keeps the existing press-and-drag gesture for moving events and selecting
 a time range.

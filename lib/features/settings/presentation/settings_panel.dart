@@ -1,12 +1,14 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:weekra/app/app_version.dart';
+import 'package:weekra/app/glass_surface.dart';
 import 'package:weekra/app/weekra_design.dart';
 import 'package:weekra/app/weekra_theme.dart';
+import 'package:weekra/features/calendar/domain/event_category.dart';
 import 'package:weekra/features/settings/domain/app_settings.dart';
 import 'package:weekra/l10n/app_localizations.dart';
 
-enum _SettingsSection { appearance, language, about }
+enum _SettingsSection { calendar, categories, appearance, language, about }
 
 class SettingsPanel extends StatefulWidget {
   const SettingsPanel({
@@ -29,7 +31,7 @@ class SettingsPanel extends StatefulWidget {
 }
 
 class _SettingsPanelState extends State<SettingsPanel> {
-  _SettingsSection _section = _SettingsSection.appearance;
+  _SettingsSection _section = _SettingsSection.calendar;
 
   @override
   Widget build(BuildContext context) {
@@ -61,9 +63,7 @@ class _SettingsPanelState extends State<SettingsPanel> {
           padding: const EdgeInsets.fromLTRB(18, 20, 14, 20),
           decoration: const BoxDecoration(
             color: Color(0x8A131518),
-            border: Border(
-              right: BorderSide(color: WeekraColors.divider),
-            ),
+            border: Border(right: BorderSide(color: WeekraColors.divider)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -79,6 +79,7 @@ class _SettingsPanelState extends State<SettingsPanel> {
                       ),
                     ),
                     IconButton(
+                      key: const Key('close-settings'),
                       tooltip: l10n.closeTooltip,
                       onPressed: widget.onClose,
                       icon: const Icon(Icons.close_rounded),
@@ -90,6 +91,24 @@ class _SettingsPanelState extends State<SettingsPanel> {
                 child: ListView(
                   padding: EdgeInsets.zero,
                   children: [
+                    _NavigationItem(
+                      icon: Icons.calendar_view_week_outlined,
+                      label: l10n.settingsCalendar,
+                      subtitle: l10n.settingsCalendarDescription,
+                      selected: _section == _SettingsSection.calendar,
+                      accent: widget.settings.theme.accent,
+                      onTap: () => _select(_SettingsSection.calendar),
+                    ),
+                    const SizedBox(height: 6),
+                    _NavigationItem(
+                      icon: Icons.label_outline_rounded,
+                      label: l10n.settingsCategories,
+                      subtitle: l10n.settingsCategoriesDescription,
+                      selected: _section == _SettingsSection.categories,
+                      accent: widget.settings.theme.accent,
+                      onTap: () => _select(_SettingsSection.categories),
+                    ),
+                    const SizedBox(height: 6),
                     _NavigationItem(
                       icon: Icons.palette_outlined,
                       label: l10n.settingsAppearance,
@@ -130,7 +149,9 @@ class _SettingsPanelState extends State<SettingsPanel> {
             ],
           ),
         ),
-        Expanded(child: _SectionContent(section: _section, panel: widget)),
+        Expanded(
+          child: _SectionContent(section: _section, panel: widget),
+        ),
       ],
     );
   }
@@ -151,6 +172,7 @@ class _SettingsPanelState extends State<SettingsPanel> {
                 ),
               ),
               IconButton(
+                key: const Key('close-settings'),
                 tooltip: l10n.closeTooltip,
                 onPressed: widget.onClose,
                 icon: const Icon(Icons.close_rounded),
@@ -163,6 +185,22 @@ class _SettingsPanelState extends State<SettingsPanel> {
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Row(
             children: [
+              _CompactNavigationItem(
+                icon: Icons.calendar_view_week_outlined,
+                label: l10n.settingsCalendar,
+                selected: _section == _SettingsSection.calendar,
+                accent: widget.settings.theme.accent,
+                onTap: () => _select(_SettingsSection.calendar),
+              ),
+              const SizedBox(width: 8),
+              _CompactNavigationItem(
+                icon: Icons.label_outline_rounded,
+                label: l10n.settingsCategories,
+                selected: _section == _SettingsSection.categories,
+                accent: widget.settings.theme.accent,
+                onTap: () => _select(_SettingsSection.categories),
+              ),
+              const SizedBox(width: 8),
               _CompactNavigationItem(
                 icon: Icons.palette_outlined,
                 label: l10n.settingsAppearance,
@@ -191,7 +229,9 @@ class _SettingsPanelState extends State<SettingsPanel> {
         ),
         const SizedBox(height: 8),
         const Divider(height: 1),
-        Expanded(child: _SectionContent(section: _section, panel: widget)),
+        Expanded(
+          child: _SectionContent(section: _section, panel: widget),
+        ),
       ],
     );
   }
@@ -229,7 +269,11 @@ class _SectionContent extends StatelessWidget {
         children: [
           _SectionHeader(section: section),
           const SizedBox(height: 26),
-          if (section == _SettingsSection.appearance)
+          if (section == _SettingsSection.calendar)
+            _CalendarCard(panel: panel)
+          else if (section == _SettingsSection.categories)
+            _CategoriesCard(panel: panel)
+          else if (section == _SettingsSection.appearance)
             _AppearanceCard(panel: panel)
           else if (section == _SettingsSection.language)
             _LanguageCard(panel: panel)
@@ -250,6 +294,14 @@ class _SectionHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final (title, description) = switch (section) {
+      _SettingsSection.calendar => (
+        l10n.settingsCalendar,
+        l10n.settingsCalendarDescription,
+      ),
+      _SettingsSection.categories => (
+        l10n.settingsCategories,
+        l10n.settingsCategoriesDescription,
+      ),
       _SettingsSection.appearance => (
         l10n.settingsAppearance,
         l10n.settingsAppearanceDescription,
@@ -270,6 +322,438 @@ class _SectionHeader extends StatelessWidget {
         const SizedBox(height: 7),
         Text(description, style: Theme.of(context).textTheme.bodySmall),
       ],
+    );
+  }
+}
+
+class _CalendarCard extends StatelessWidget {
+  const _CalendarCard({required this.panel});
+
+  final SettingsPanel panel;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final settings = panel.settings.calendar;
+    return _SettingsCard(
+      title: l10n.settingsCalendarArrangement,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            l10n.settingsCalendarArrangementDescription,
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              ChoiceChip(
+                key: const Key('calendar-anchor-today'),
+                label: Text(l10n.settingsAnchorToday),
+                selected: settings.anchorMode == CalendarAnchorMode.today,
+                onSelected: (_) => _setCalendar(
+                  settings.copyWith(anchorMode: CalendarAnchorMode.today),
+                ),
+              ),
+              ChoiceChip(
+                key: const Key('calendar-anchor-week-start'),
+                label: Text(l10n.settingsAnchorWeekStart),
+                selected: settings.anchorMode == CalendarAnchorMode.weekStart,
+                onSelected: (_) => _setCalendar(
+                  settings.copyWith(anchorMode: CalendarAnchorMode.weekStart),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 22),
+          AnimatedSwitcher(
+            duration: WeekraMotion.resolve(context, WeekraMotion.content),
+            child: settings.anchorMode == CalendarAnchorMode.today
+                ? _CalendarChoiceGroup(
+                    key: const ValueKey('today-position'),
+                    title: l10n.settingsTodayPosition,
+                    description: l10n.settingsTodayPositionDescription,
+                    children: [
+                      for (var index = 0; index < 7; index++)
+                        ChoiceChip(
+                          key: Key('calendar-today-column-$index'),
+                          label: Text(l10n.settingsColumnNumber(index + 1)),
+                          selected: settings.todayColumn == index,
+                          onSelected: (_) => _setCalendar(
+                            settings.copyWith(todayColumn: index),
+                          ),
+                        ),
+                    ],
+                  )
+                : _CalendarChoiceGroup(
+                    key: const ValueKey('week-start'),
+                    title: l10n.settingsWeekStartsOn,
+                    description: l10n.settingsWeekStartsOnDescription,
+                    children: [
+                      for (
+                        var weekday = DateTime.monday;
+                        weekday <= DateTime.sunday;
+                        weekday++
+                      )
+                        ChoiceChip(
+                          key: Key('calendar-week-start-$weekday'),
+                          label: Text(_weekdayName(context, weekday)),
+                          selected: settings.weekStartsOn == weekday,
+                          onSelected: (_) => _setCalendar(
+                            settings.copyWith(weekStartsOn: weekday),
+                          ),
+                        ),
+                    ],
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _setCalendar(CalendarViewSettings value) {
+    panel.onChanged(panel.settings.copyWith(calendar: value));
+  }
+}
+
+class _CalendarChoiceGroup extends StatelessWidget {
+  const _CalendarChoiceGroup({
+    super.key,
+    required this.title,
+    required this.description,
+    required this.children,
+  });
+
+  final String title;
+  final String description;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: Theme.of(context).textTheme.titleSmall),
+        const SizedBox(height: 5),
+        Text(description, style: Theme.of(context).textTheme.bodySmall),
+        const SizedBox(height: 12),
+        Wrap(spacing: 8, runSpacing: 8, children: children),
+      ],
+    );
+  }
+}
+
+class _CategoriesCard extends StatelessWidget {
+  const _CategoriesCard({required this.panel});
+
+  final SettingsPanel panel;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return _SettingsCard(
+      title: l10n.settingsCategories,
+      child: Column(
+        children: [
+          for (
+            var index = 0;
+            index < EventCategories.values.length;
+            index++
+          ) ...[
+            _CategorySettingsRow(
+              category: EventCategories.values[index],
+              panel: panel,
+            ),
+            if (index < EventCategories.values.length - 1)
+              const Divider(height: 1),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _CategorySettingsRow extends StatelessWidget {
+  const _CategorySettingsRow({required this.category, required this.panel});
+
+  final EventCategory category;
+  final SettingsPanel panel;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final settings = panel.settings.categories;
+    final fallbackName = _defaultCategoryName(l10n, category.id);
+    final name = settings.nameFor(category.id, fallbackName);
+    final color = settings.colorFor(category.id, category.color);
+    return InkWell(
+      key: Key('settings-category-${category.id}'),
+      onTap: () => _edit(context, name: name, color: color),
+      borderRadius: BorderRadius.circular(11),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
+        child: Row(
+          children: [
+            Container(
+              key: Key('settings-category-color-${category.id}'),
+              width: 18,
+              height: 18,
+              decoration: BoxDecoration(
+                color: color,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white.withValues(alpha: .18)),
+              ),
+            ),
+            const SizedBox(width: 13),
+            Expanded(
+              child: Text(
+                name,
+                key: Key('settings-category-name-${category.id}'),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            Text(l10n.edit, style: Theme.of(context).textTheme.bodySmall),
+            const SizedBox(width: 5),
+            const Icon(
+              Icons.chevron_right_rounded,
+              size: 18,
+              color: WeekraColors.textTertiary,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _edit(
+    BuildContext context, {
+    required String name,
+    required Color color,
+  }) async {
+    final result = await _showCategoryEditor(
+      context,
+      categoryId: category.id,
+      initialName: name,
+      initialColor: color,
+    );
+    if (result == null || !context.mounted) {
+      return;
+    }
+    final categories = panel.settings.categories.customize(
+      category.id,
+      name: result.name,
+      color: result.color,
+    );
+    panel.onChanged(panel.settings.copyWith(categories: categories));
+  }
+}
+
+typedef _CategoryEditorResult = ({String name, Color color});
+
+const _categoryPalette = <Color>[
+  Color(0xFFF1776C),
+  Color(0xFFFF967A),
+  Color(0xFFC6A15B),
+  Color(0xFFE1C45A),
+  Color(0xFF72A57C),
+  Color(0xFF70B8AF),
+  Color(0xFF5BB7D2),
+  Color(0xFF7F9DD4),
+  Color(0xFF8E82D8),
+  Color(0xFFB7799E),
+  Color(0xFFD878A2),
+  Color(0xFF9A9FA7),
+];
+
+Future<_CategoryEditorResult?> _showCategoryEditor(
+  BuildContext context, {
+  required String categoryId,
+  required String initialName,
+  required Color initialColor,
+}) {
+  return showGlassDialog<_CategoryEditorResult>(
+    context,
+    maxWidth: 420,
+    maxHeight: 520,
+    builder: (dialogContext) => _CategoryEditorDialog(
+      categoryId: categoryId,
+      initialName: initialName,
+      initialColor: initialColor,
+    ),
+  );
+}
+
+class _CategoryEditorDialog extends StatefulWidget {
+  const _CategoryEditorDialog({
+    required this.categoryId,
+    required this.initialName,
+    required this.initialColor,
+  });
+
+  final String categoryId;
+  final String initialName;
+  final Color initialColor;
+
+  @override
+  State<_CategoryEditorDialog> createState() => _CategoryEditorDialogState();
+}
+
+class _CategoryEditorDialogState extends State<_CategoryEditorDialog> {
+  late final TextEditingController _controller;
+  late Color _selectedColor;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialName);
+    _selectedColor = widget.initialColor;
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final canSave = _controller.text.trim().isNotEmpty;
+    return Material(
+      color: Colors.transparent,
+      child: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(24, 20, 24, 22),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      l10n.settingsEditCategory,
+                      style: Theme.of(context).textTheme.headlineSmall,
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: l10n.closeTooltip,
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              TextField(
+                key: Key('category-name-field-${widget.categoryId}'),
+                controller: _controller,
+                autofocus: true,
+                maxLength: 18,
+                onChanged: (_) => setState(() {}),
+                decoration: InputDecoration(
+                  labelText: l10n.settingsCategoryName,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                l10n.settingsCategoryColor,
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  for (var index = 0; index < _categoryPalette.length; index++)
+                    _CategoryColorChoice(
+                      key: Key('category-color-choice-$index'),
+                      color: _categoryPalette[index],
+                      selected:
+                          _categoryPalette[index].toARGB32() ==
+                          _selectedColor.toARGB32(),
+                      onTap: () => setState(
+                        () => _selectedColor = _categoryPalette[index],
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 26),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: Text(l10n.cancel),
+                  ),
+                  const SizedBox(width: 10),
+                  FilledButton(
+                    key: const Key('save-category-settings'),
+                    onPressed: canSave
+                        ? () => Navigator.pop(context, (
+                            name: _controller.text.trim(),
+                            color: _selectedColor,
+                          ))
+                        : null,
+                    child: Text(l10n.saveChanges),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CategoryColorChoice extends StatelessWidget {
+  const _CategoryColorChoice({
+    super.key,
+    required this.color,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final Color color;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      selected: selected,
+      child: InkWell(
+        onTap: onTap,
+        customBorder: const CircleBorder(),
+        child: AnimatedContainer(
+          duration: WeekraMotion.resolve(context, WeekraMotion.quick),
+          width: 38,
+          height: 38,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: selected ? Colors.white : Colors.white24,
+              width: selected ? 3 : 1,
+            ),
+            boxShadow: selected
+                ? [
+                    BoxShadow(
+                      color: color.withValues(alpha: .42),
+                      blurRadius: 10,
+                    ),
+                  ]
+                : null,
+          ),
+          child: selected
+              ? const Icon(Icons.check_rounded, size: 20, color: Colors.white)
+              : null,
+        ),
+      ),
     );
   }
 }
@@ -512,9 +996,7 @@ class _NavigationItem extends StatelessWidget {
         curve: WeekraMotion.standard,
         padding: const EdgeInsets.fromLTRB(12, 11, 10, 11),
         decoration: BoxDecoration(
-          color: selected
-              ? WeekraColors.surfaceRaised
-              : Colors.transparent,
+          color: selected ? WeekraColors.surfaceRaised : Colors.transparent,
           borderRadius: BorderRadius.circular(13),
           border: Border.all(
             color: selected ? WeekraColors.outline : Colors.transparent,
@@ -594,9 +1076,7 @@ class _CompactNavigationItem extends StatelessWidget {
       label: Text(label),
       selectedColor: accent,
       backgroundColor: WeekraColors.surfaceRaised,
-      side: BorderSide(
-        color: selected ? accent : WeekraColors.outline,
-      ),
+      side: BorderSide(color: selected ? accent : WeekraColors.outline),
       onSelected: (_) => onTap(),
     );
   }
@@ -651,10 +1131,7 @@ class _ThemeChoice extends StatelessWidget {
                 alignment: Alignment.topRight,
                 child: AnimatedOpacity(
                   opacity: active ? 1 : 0,
-                  duration: WeekraMotion.resolve(
-                    context,
-                    WeekraMotion.quick,
-                  ),
+                  duration: WeekraMotion.resolve(context, WeekraMotion.quick),
                   child: Padding(
                     padding: const EdgeInsets.all(7),
                     child: Icon(
@@ -701,9 +1178,7 @@ class _LanguageChoice extends StatelessWidget {
   Widget build(BuildContext context) {
     final active = value == panel.settings.language;
     return InkWell(
-      onTap: () => panel.onChanged(
-        panel.settings.copyWith(language: value),
-      ),
+      onTap: () => panel.onChanged(panel.settings.copyWith(language: value)),
       borderRadius: BorderRadius.circular(10),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 13),
@@ -719,15 +1194,28 @@ class _LanguageChoice extends StatelessWidget {
                       size: 20,
                       color: panel.settings.theme.accent,
                     )
-                  : const SizedBox(
-                      key: ValueKey(false),
-                      width: 20,
-                      height: 20,
-                    ),
+                  : const SizedBox(key: ValueKey(false), width: 20, height: 20),
             ),
           ],
         ),
       ),
     );
   }
+}
+
+String _weekdayName(BuildContext context, int weekday) {
+  final names = MaterialLocalizations.of(context).narrowWeekdays;
+  return names[weekday % DateTime.daysPerWeek];
+}
+
+String _defaultCategoryName(AppLocalizations l10n, String categoryId) {
+  return switch (categoryId) {
+    'category-1' => l10n.categoryOne,
+    'category-2' => l10n.categoryTwo,
+    'category-3' => l10n.categoryThree,
+    'category-4' => l10n.categoryFour,
+    'category-5' => l10n.categoryFive,
+    'category-6' => l10n.categorySix,
+    _ => l10n.uncategorized,
+  };
 }

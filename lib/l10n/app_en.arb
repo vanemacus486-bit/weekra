@@ -114,6 +114,29 @@
   "seedEveningWalk": "Evening walk",
   "settingsTooltip": "Settings",
   "settingsTitle": "Settings",
+  "settingsCalendar": "Calendar",
+  "settingsCalendarDescription": "Choose how the seven-day timeline is anchored.",
+  "settingsCategories": "Categories",
+  "settingsCategoriesDescription": "Rename categories and choose their colors.",
+  "settingsCalendarArrangement": "Week arrangement",
+  "settingsCalendarArrangementDescription": "Keep today in a chosen column, or align every view to a fixed weekday.",
+  "settingsAnchorToday": "Position today",
+  "settingsAnchorWeekStart": "Fixed week start",
+  "settingsTodayPosition": "Today’s position",
+  "settingsTodayPositionDescription": "Choose which of the seven columns contains today.",
+  "settingsColumnNumber": "Column {column}",
+  "@settingsColumnNumber": {
+    "placeholders": {
+      "column": {
+        "type": "int"
+      }
+    }
+  },
+  "settingsWeekStartsOn": "Week starts on",
+  "settingsWeekStartsOnDescription": "The visible range always begins on this weekday.",
+  "settingsEditCategory": "Edit category",
+  "settingsCategoryName": "Category name",
+  "settingsCategoryColor": "Category color",
   "settingsAppearance": "Appearance",
   "settingsLanguage": "Language",
   "themeEmber": "Ember",

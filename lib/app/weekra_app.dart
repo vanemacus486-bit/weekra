@@ -112,6 +112,8 @@ class _WeekraAppState extends State<WeekraApp> {
           builder: (context) => WeekScreen(
             eventStore: widget.eventStore,
             theme: _settings.theme,
+            calendarSettings: _settings.calendar,
+            categorySettings: _settings.categories,
             clock: widget.clock,
             onOpenSettings: () => _openSettings(context),
           ),

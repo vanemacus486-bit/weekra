@@ -7,6 +7,8 @@ import 'package:weekra/app/weekra_app.dart';
 import 'package:weekra/features/calendar/data/calendar_event_store.dart';
 import 'package:weekra/features/calendar/domain/calendar_event.dart';
 import 'package:weekra/features/calendar/domain/event_category.dart';
+import 'package:weekra/features/settings/data/app_settings_store.dart';
+import 'package:weekra/features/settings/domain/app_settings.dart';
 
 void main() {
   testWidgets('centers today and flows the visible dates one day at a time', (
@@ -328,6 +330,123 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  testWidgets('applies and saves the chosen calendar arrangement', (
+    tester,
+  ) async {
+    _useViewport(tester, const Size(1280, 800));
+    final now = DateTime(2026, 9, 14, 13, 30);
+    final settingsStore = _MemoryAppSettingsStore();
+    await tester.pumpWidget(
+      WeekraApp(
+        eventStore: _MemoryEventStore(),
+        settingsStore: settingsStore,
+        locale: const Locale('en'),
+        enableAutomaticUpdates: false,
+        clock: () => now,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('open-settings')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('calendar-today-column-1')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('close-settings')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('hourly-header-20260913')),
+      findsOneWidget,
+    );
+    expect(settingsStore.saved.calendar.todayColumn, 1);
+
+    await tester.tap(find.byKey(const Key('open-settings')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('calendar-anchor-week-start')));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const Key('calendar-week-start-${DateTime.wednesday}')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('close-settings')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('hourly-header-20260909')),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const Key('timeline-next-day')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('hourly-header-20260916')),
+      findsOneWidget,
+    );
+    expect(
+      settingsStore.saved.calendar.anchorMode,
+      CalendarAnchorMode.weekStart,
+    );
+    expect(settingsStore.saved.calendar.weekStartsOn, DateTime.wednesday);
+  });
+
+  testWidgets('renames and recolors a category throughout the calendar', (
+    tester,
+  ) async {
+    _useViewport(tester, const Size(1280, 800));
+    _useDesktopPlatform();
+    final now = DateTime(2026, 9, 14, 13, 30);
+    final event = CalendarEvent(
+      id: 'custom-category-event',
+      title: 'Study session',
+      start: DateTime(2026, 9, 11, 9),
+      end: DateTime(2026, 9, 11, 10),
+      categoryId: 'category-1',
+      color: EventCategories.colorFor('category-1'),
+    );
+    final settingsStore = _MemoryAppSettingsStore();
+    await tester.pumpWidget(
+      WeekraApp(
+        eventStore: _MemoryEventStore([event]),
+        settingsStore: settingsStore,
+        locale: const Locale('en'),
+        enableAutomaticUpdates: false,
+        clock: () => now,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('open-settings')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Categories').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('settings-category-category-1')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('category-name-field-category-1')),
+      'Course',
+    );
+    await tester.tap(find.byKey(const Key('category-color-choice-6')));
+    await tester.tap(find.byKey(const Key('save-category-settings')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('close-settings')));
+    await tester.pumpAndSettle();
+
+    expect(
+      settingsStore.saved.categories.nameFor('category-1', 'fallback'),
+      'Course',
+    );
+    expect(
+      settingsStore.saved.categories.colorFor('category-1', Colors.black),
+      const Color(0xFF5BB7D2),
+    );
+    await tester.tap(
+      find.byKey(const Key('hourly-event-custom-category-event')),
+      buttons: kSecondaryMouseButton,
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Course'), findsOneWidget);
+    _restoreTestPlatform();
+  });
 
   testWidgets('shows the Weekra week view', (tester) async {
     await tester.pumpWidget(
@@ -1181,6 +1300,22 @@ class _MemoryEventStore implements CalendarEventStore {
     }
     _returnsNull = false;
     savedEvents = List.of(events);
+  }
+}
+
+class _MemoryAppSettingsStore implements AppSettingsStore {
+  _MemoryAppSettingsStore() : saved = const AppSettings();
+
+  AppSettings saved;
+  int saveCalls = 0;
+
+  @override
+  Future<AppSettings> load() async => saved;
+
+  @override
+  Future<void> save(AppSettings settings) async {
+    saveCalls += 1;
+    saved = settings;
   }
 }
 
