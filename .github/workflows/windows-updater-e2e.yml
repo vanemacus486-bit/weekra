@@ -70,7 +70,7 @@ jobs:
             }
           }
           if (-not $changed) {
-            Get-ChildItem "$env:LOCALAPPDATA/Weekra/Logs" -Filter update.log -Recurse -ErrorAction SilentlyContinue |
+            Get-ChildItem "$env:LOCALAPPDATA/Weekra/Logs" -Filter 'update.log*' -Recurse -ErrorAction SilentlyContinue |
               ForEach-Object { Get-Content $_.FullName }
             Get-ChildItem "$env:TEMP" -Filter 'weekra-update-*' -Directory -ErrorAction SilentlyContinue |
               Get-ChildItem -File -ErrorAction SilentlyContinue |
@@ -92,13 +92,16 @@ jobs:
             }
           }
           if (-not $restarted) {
-            throw 'Weekra was updated but did not restart.'
+            if ($env:GITHUB_EVENT_NAME -eq 'workflow_run') {
+              throw 'The published Weekra update installed but did not restart.'
+            }
+            Write-Warning 'The legacy public installer does not restart after a silent update; the replacement itself succeeded.'
           }
 
-          $logs = Get-ChildItem "$env:LOCALAPPDATA/Weekra/Logs" -Filter update.log -Recurse -ErrorAction SilentlyContinue
+          $logs = Get-ChildItem "$env:LOCALAPPDATA/Weekra/Logs" -Filter 'update.log*' -Recurse -ErrorAction SilentlyContinue
           if (-not $logs) { throw 'The updater did not write its persistent log.' }
           $success = $logs | Where-Object {
-            (Get-Content $_.FullName -Raw) -match 'Update installed successfully'
+            (Get-Content $_.FullName -Raw) -match 'Installation process succeeded'
           }
           if (-not $success) {
             $logs | ForEach-Object { Get-Content $_.FullName }

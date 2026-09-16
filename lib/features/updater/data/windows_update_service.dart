@@ -98,7 +98,7 @@ class WindowsUpdateService implements UpdateService {
         );
       }
       onProgress?.call(1);
-      await _launchInstallerScript(workDirectory, installer);
+      await _launchInstaller(installer);
     } on Object catch (error, stackTrace) {
       await _writeDiagnostic('download', error, stackTrace);
       if (await workDirectory.exists()) {
@@ -179,47 +179,34 @@ class WindowsUpdateService implements UpdateService {
     Error.throwWithStackTrace(lastError!, lastStackTrace!);
   }
 
-  Future<void> _launchInstallerScript(
-    Directory workDirectory,
-    File installer,
-  ) async {
+  Future<void> _launchInstaller(File installer) async {
     final executable = File(Platform.resolvedExecutable);
     final installDirectory = executable.parent.path;
     final logPath = (await _diagnosticFile()).path;
-    final script = File('${workDirectory.path}\\install-update.ps1');
-    final ready = File('${workDirectory.path}\\installer-ready');
-    final scriptContents = buildWindowsInstallerScript(
-      installerPath: installer.path,
+    final installerLog = File('$logPath.installer');
+    if (await installerLog.exists()) await installerLog.delete();
+    final arguments = windowsInstallerArguments(
       installDirectory: installDirectory,
-      executablePath: executable.path,
-      logPath: logPath,
-      readyPath: ready.path,
-      appProcessId: pid,
+      installerLogPath: installerLog.path,
     );
-    await script.writeAsString(scriptContents, flush: true);
-    final helper = await Process.start(
-      'powershell.exe',
-      [
-        '-NoProfile',
-        '-NonInteractive',
-        '-ExecutionPolicy',
-        'Bypass',
-        '-WindowStyle',
-        'Hidden',
-        '-File',
-        script.path,
-      ],
+    final setup = await Process.start(
+      installer.path,
+      arguments,
       mode: ProcessStartMode.detached,
     );
-    for (var attempt = 0; attempt < 100 && !await ready.exists(); attempt++) {
+    for (
+      var attempt = 0;
+      attempt < 300 && !await installerLog.exists();
+      attempt++
+    ) {
       await Future<void>.delayed(const Duration(milliseconds: 100));
     }
-    if (!await ready.exists()) {
-      helper.kill();
+    if (!await installerLog.exists()) {
+      setup.kill();
       throw ProcessException(
-        'powershell.exe',
-        <String>[],
-        'The update installer did not acknowledge the handoff.',
+        installer.path,
+        arguments,
+        'The verified installer did not acknowledge the handoff.',
       );
     }
     exit(0);
@@ -295,52 +282,17 @@ AppUpdate? parseUpdateManifest(
   );
 }
 
-String buildWindowsInstallerScript({
-  required String installerPath,
+List<String> windowsInstallerArguments({
   required String installDirectory,
-  required String executablePath,
-  required String logPath,
-  required String readyPath,
-  required int appProcessId,
-}) {
-  String literal(String value) => value.replaceAll("'", "''");
-
-  return '''
-\$ErrorActionPreference = 'Stop'
-\$installer = '${literal(installerPath)}'
-\$install = '${literal(installDirectory)}'
-\$executable = '${literal(executablePath)}'
-\$log = '${literal(logPath)}'
-\$ready = '${literal(readyPath)}'
-\$appPid = $appProcessId
-
-try {
-  "[\$(Get-Date -Format o)] Waiting for Weekra process \$appPid." | Out-File -LiteralPath \$log -Encoding UTF8
-  New-Item -ItemType File -Path \$ready -Force | Out-Null
-  Wait-Process -Id \$appPid -ErrorAction SilentlyContinue
-  \$arguments = @(
-    '/VERYSILENT'
-    '/SUPPRESSMSGBOXES'
-    '/NORESTART'
-    '/SP-'
-    ('/DIR="' + \$install + '"')
-    ('/LOG="' + \$log + '.installer"')
-  )
-  \$process = Start-Process -FilePath \$installer -ArgumentList \$arguments -Wait -PassThru
-  if (\$process.ExitCode -ne 0) {
-    throw "Weekra installer failed with exit code \$(\$process.ExitCode)."
-  }
-  if (-not (Test-Path -LiteralPath \$executable)) {
-    throw 'Weekra executable was not found after installation.'
-  }
-  "[\$(Get-Date -Format o)] Update installed successfully." | Out-File -LiteralPath \$log -Encoding UTF8 -Append
-  Start-Process -FilePath \$executable -WorkingDirectory \$install
-} catch {
-  "[\$(Get-Date -Format o)] Update installation failed." | Out-File -LiteralPath \$log -Encoding UTF8 -Append
-  \$_ | Out-File -LiteralPath \$log -Encoding UTF8 -Append
-  if (Test-Path -LiteralPath \$executable) {
-    Start-Process -FilePath \$executable -WorkingDirectory \$install
-  }
-}
-''';
-}
+  required String installerLogPath,
+}) =>
+    <String>[
+      '/VERYSILENT',
+      '/SUPPRESSMSGBOXES',
+      '/NORESTART',
+      '/SP-',
+      '/CLOSEAPPLICATIONS',
+      '/RESTARTAPPLICATIONS',
+      '/DIR=$installDirectory',
+      '/LOG=$installerLogPath',
+    ];
