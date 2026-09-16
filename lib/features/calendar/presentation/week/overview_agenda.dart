@@ -1,0 +1,413 @@
+part of '../week_screen.dart';
+
+class _WeekGridSummary extends StatefulWidget {
+  const _WeekGridSummary({
+    super.key,
+    required this.today,
+    required this.events,
+    required this.onEventTap,
+    required this.onCreate,
+  });
+
+  final DateTime today;
+  final List<CalendarEvent> events;
+  final _OpenEventCallback onEventTap;
+  final ValueChanged<DateTime> onCreate;
+
+  @override
+  State<_WeekGridSummary> createState() => _WeekGridSummaryState();
+}
+
+class _WeekGridSummaryState extends State<_WeekGridSummary> {
+  /// Days rendered on each side of today to begin with.
+  static const _initialDays = 45;
+
+  /// Days added every time the reader gets close to an end.
+  static const _extendStep = 45;
+
+  /// How close to an end triggers the next extension, in pixels.
+  static const _extendThreshold = 600.0;
+
+  static const _todayAnchorKey = Key('overview-today-anchor');
+  static const _bottomInset = 92.0;
+
+  late int _pastDays;
+  late int _futureDays;
+
+  @override
+  void initState() {
+    super.initState();
+    _pastDays = _initialDays;
+    _futureDays = _initialDays;
+  }
+
+  DateTime get _origin => DateUtils.dateOnly(widget.today);
+
+  int _dayKey(DateTime day) => day.year * 10000 + day.month * 100 + day.day;
+
+  bool _handleScroll(ScrollNotification notification) {
+    final metrics = notification.metrics;
+    if (!metrics.hasPixels) {
+      return false;
+    }
+    final extendPast = metrics.extentBefore < _extendThreshold;
+    final extendFuture = metrics.extentAfter < _extendThreshold;
+    if (!extendPast && !extendFuture) {
+      return false;
+    }
+    setState(() {
+      if (extendPast) _pastDays += _extendStep;
+      if (extendFuture) _futureDays += _extendStep;
+    });
+    return false;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final byDay = <int, List<CalendarEvent>>{};
+    for (final event in widget.events) {
+      byDay.putIfAbsent(_dayKey(event.start), () => []).add(event);
+    }
+    for (final dayEvents in byDay.values) {
+      dayEvents.sort((a, b) => a.startMinutes.compareTo(b.startMinutes));
+    }
+
+    Widget dayRow({
+      required DateTime day,
+      required bool showTopRule,
+    }) {
+      return _AgendaDay(
+        day: day,
+        events: byDay[_dayKey(day)] ?? const <CalendarEvent>[],
+        isToday: _isSameDay(day, widget.today),
+        showTopRule: showTopRule,
+        onEventTap: widget.onEventTap,
+        onCreate: widget.onCreate,
+      );
+    }
+
+    final agenda = ColoredBox(
+      color: WeekraColors.overviewSurface,
+      child: NotificationListener<ScrollNotification>(
+        onNotification: _handleScroll,
+        child: CustomScrollView(
+          key: const Key('week-grid-layout'),
+          center: _todayAnchorKey,
+          slivers: [
+            SliverList(
+              delegate: SliverChildBuilderDelegate((context, index) {
+                return dayRow(
+                  day: _origin.subtract(Duration(days: index + 1)),
+                  showTopRule: true,
+                );
+              }, childCount: _pastDays),
+            ),
+            SliverList(
+              key: _todayAnchorKey,
+              delegate: SliverChildBuilderDelegate((context, index) {
+                return dayRow(
+                  day: _origin.add(Duration(days: index)),
+                  showTopRule: index > 0,
+                );
+              }, childCount: _futureDays),
+            ),
+            const SliverToBoxAdapter(child: SizedBox(height: _bottomInset)),
+          ],
+        ),
+      ),
+    );
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < WeekraMetrics.overviewPanelBreakpoint) {
+          return agenda;
+        }
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(flex: 11, child: agenda),
+            Expanded(flex: 9, child: _TodayPanel(today: widget.today)),
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// Global anchor beside the overview agenda.
+///
+/// It always reports the real current date, so browsing other weeks never
+/// changes what "today" means.
+class _TodayPanel extends StatelessWidget {
+  const _TodayPanel({required this.today});
+
+  final DateTime today;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return DecoratedBox(
+      key: const Key('overview-today-panel'),
+      decoration: const BoxDecoration(
+        border: Border(left: BorderSide(color: _line)),
+      ),
+      child: Padding(
+        padding: const EdgeInsetsDirectional.fromSTEB(24, 22, 24, 22),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Text(
+              l10n.today,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: _tertiaryInk,
+                fontSize: 11,
+                height: 1.2,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 2,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              MaterialLocalizations.of(context).formatFullDate(today),
+              textAlign: TextAlign.center,
+              softWrap: true,
+              style: const TextStyle(
+                color: _ink,
+                fontSize: 19,
+                height: 1.3,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AgendaDay extends StatelessWidget {
+  const _AgendaDay({
+    required this.day,
+    required this.events,
+    required this.isToday,
+    required this.showTopRule,
+    required this.onEventTap,
+    required this.onCreate,
+  });
+
+  final DateTime day;
+  final List<CalendarEvent> events;
+  final bool isToday;
+
+  /// The overview is one continuous page, so the day boundary is drawn as a
+  /// rule on top of the event area. The first day has nothing above it.
+  final bool showTopRule;
+  final _OpenEventCallback onEventTap;
+  final ValueChanged<DateTime> onCreate;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final accent = Theme.of(context).colorScheme.primary;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => onCreate(day),
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              key: const Key('overview-day-column'),
+              width: WeekraMetrics.dayColumnWidth,
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+              color: WeekraColors.dayStrip,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    _weekdayShortName(l10n, day.weekday),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: isToday ? accent : _mutedInk,
+                      fontSize: 10,
+                      height: 1.15,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${day.day}',
+                    maxLines: 1,
+                    overflow: TextOverflow.visible,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: isToday ? accent : _ink,
+                      fontSize: 20,
+                      height: 1.15,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  border: showTopRule
+                      ? const Border(top: BorderSide(color: _line))
+                      : null,
+                ),
+                child: Padding(
+                  padding: const EdgeInsetsDirectional.fromSTEB(16, 12, 18, 12),
+                  child: events.isEmpty
+                      ? const SizedBox(height: 44)
+                      : Column(
+                          children: [
+                            for (
+                              var index = 0;
+                              index < events.length;
+                              index++
+                            ) ...[
+                              _AgendaEvent(
+                                event: events[index],
+                                onTap: onEventTap,
+                              ),
+                              if (index != events.length - 1)
+                                _AgendaGap(
+                                  gapStartMinutes: events[index].endMinutes,
+                                  gapEndMinutes: events[index + 1].startMinutes,
+                                ),
+                            ],
+                          ],
+                        ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AgendaEvent extends StatelessWidget {
+  const _AgendaEvent({required this.event, required this.onTap});
+
+  final CalendarEvent event;
+  final _OpenEventCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final start = _formatTime(context, event.startMinutes);
+    final end = _formatTime(context, event.endMinutes);
+    final isAllDay = _isAllDayEvent(event);
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => onTap(event),
+      child: Container(
+        padding: const EdgeInsetsDirectional.fromSTEB(12, 9, 10, 9),
+        decoration: BoxDecoration(
+          gradient: WeekraEventStyle.gradient(event.color),
+          border: Border.all(
+            color: event.color.withValues(alpha: .20),
+            width: .75,
+          ),
+          borderRadius: BorderRadius.circular(WeekraMetrics.eventRadius),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Flexible(
+              child: Text(
+                isAllDay ? l10n.allDay : '$start\n$end',
+                maxLines: 2,
+                overflow: TextOverflow.fade,
+                softWrap: false,
+                style: const TextStyle(
+                  color: _mutedInk,
+                  fontSize: 11,
+                  height: 1.45,
+                  fontFeatures: [FontFeature.tabularFigures()],
+                ),
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              flex: 2,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    event.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: _ink,
+                      fontSize: 15,
+                      height: 1.25,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  if (event.location != null) ...[
+                    const SizedBox(height: 3),
+                    Text(
+                      event.location!,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: _mutedInk,
+                        fontSize: 12,
+                        height: 1.25,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Separator between two events of the same overview day.
+///
+/// Events that run back to back keep a quiet spacing. When the day holds
+/// unbooked time between them, the separator sinks below the row surface so
+/// the free stretch stays visible at a glance.
+class _AgendaGap extends StatelessWidget {
+  const _AgendaGap({
+    required this.gapStartMinutes,
+    required this.gapEndMinutes,
+  });
+
+  final int gapStartMinutes;
+  final int gapEndMinutes;
+
+  @override
+  Widget build(BuildContext context) {
+    // A zero end minute means the event runs to midnight, so whatever follows
+    // either overlaps it or starts on the next day. Neither is unbooked time.
+    if (gapStartMinutes == 0 || gapEndMinutes <= gapStartMinutes) {
+      return const SizedBox(height: 12);
+    }
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Container(
+        height: 14,
+        decoration: BoxDecoration(
+          color: WeekraColors.dayGap,
+          borderRadius: BorderRadius.circular(4),
+        ),
+      ),
+    );
+  }
+}
+
