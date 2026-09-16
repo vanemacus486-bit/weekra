@@ -1304,7 +1304,7 @@ class _MemoryEventStore implements CalendarEventStore {
 }
 
 class _MemoryAppSettingsStore implements AppSettingsStore {
-  _MemoryAppSettingsStore([this.saved = const AppSettings()]);
+  _MemoryAppSettingsStore() : saved = const AppSettings();
 
   AppSettings saved;
   int saveCalls = 0;

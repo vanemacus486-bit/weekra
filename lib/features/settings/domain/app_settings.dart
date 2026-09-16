@@ -62,10 +62,7 @@ class CategoryCustomization {
   final String? name;
   final int? colorValue;
 
-  Map<String, Object> toJson() => {
-    if (name case final name?) 'name': name,
-    if (colorValue case final color?) 'color': color,
-  };
+  Map<String, Object> toJson() => {'name': ?name, 'color': ?colorValue};
 
   factory CategoryCustomization.fromJson(Map<String, dynamic> json) {
     final rawName = json['name'];
