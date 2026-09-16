@@ -413,6 +413,26 @@ void main() {
     await pointer.removePointer();
   });
 
+  testWidgets('touch platforms use the static glass profile', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: WeekraDesign.dark().copyWith(platform: TargetPlatform.android),
+        home: const GlassSurface(
+          key: Key('static-glass-test'),
+          child: SizedBox(width: 220, height: 100),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('static-glass-test')),
+        matching: find.byKey(const Key('glass-specular-layer')),
+      ),
+      findsNothing,
+    );
+  });
+
   for (final size in [const Size(1280, 800), const Size(320, 568)]) {
     testWidgets('settings stays centered and scrollable at $size', (
       tester,

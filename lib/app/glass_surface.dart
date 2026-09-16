@@ -47,10 +47,7 @@ class _GlassSurfaceState extends State<GlassSurface> {
 
   @override
   Widget build(BuildContext context) {
-    final shape = BorderRadius.circular(widget.radius);
-    final duration = WeekraMotion.resolve(context, WeekraMotion.control);
     final theme = Theme.of(context);
-    final accent = theme.colorScheme.primary;
     final desktop = switch (theme.platform) {
       TargetPlatform.windows ||
       TargetPlatform.macOS ||
@@ -59,6 +56,17 @@ class _GlassSurfaceState extends State<GlassSurface> {
       TargetPlatform.iOS ||
       TargetPlatform.fuchsia => false,
     };
+    if (!desktop) {
+      return _StaticGlassSurface(
+        radius: widget.radius,
+        thumb: widget.thumb,
+        child: widget.child,
+      );
+    }
+
+    final shape = BorderRadius.circular(widget.radius);
+    final duration = WeekraMotion.resolve(context, WeekraMotion.control);
+    final accent = theme.colorScheme.primary;
     final pointerResponsive = widget.responsive && desktop;
     final targetLight = pointerResponsive && _hovered
         ? _pointerLight
@@ -90,7 +98,7 @@ class _GlassSurfaceState extends State<GlassSurface> {
               spreadRadius: widget.thumb ? -.5 : -2,
               offset: Offset(0, widget.thumb ? 3 : (_hovered ? 14 : 11)),
             ),
-            if (!widget.thumb && desktop)
+            if (!widget.thumb)
               BoxShadow(
                 color: accent.withValues(alpha: _hovered ? .045 : .025),
                 blurRadius: _hovered ? 22 : 16,
@@ -102,8 +110,8 @@ class _GlassSurfaceState extends State<GlassSurface> {
           borderRadius: shape,
           child: BackdropFilter(
             filter: ui.ImageFilter.blur(
-              sigmaX: widget.thumb ? (desktop ? 18 : 14) : (desktop ? 24 : 18),
-              sigmaY: widget.thumb ? (desktop ? 18 : 14) : (desktop ? 24 : 18),
+              sigmaX: widget.thumb ? 18 : 24,
+              sigmaY: widget.thumb ? 18 : 24,
             ),
             child: TweenAnimationBuilder<Alignment>(
               tween: Tween<Alignment>(end: targetLight),
@@ -188,6 +196,91 @@ class _GlassSurfaceState extends State<GlassSurface> {
       ),
     );
   }
+}
+
+/// Stable, low-cost profile for touch platforms without pointer lighting.
+class _StaticGlassSurface extends StatelessWidget {
+  const _StaticGlassSurface({
+    required this.child,
+    required this.radius,
+    required this.thumb,
+  });
+
+  final Widget child;
+  final double radius;
+  final bool thumb;
+
+  @override
+  Widget build(BuildContext context) {
+    final shape = BorderRadius.circular(radius);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: shape,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: thumb ? .24 : .32),
+            blurRadius: thumb ? 8 : 32,
+            offset: Offset(0, thumb ? 3 : 12),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: shape,
+        child: BackdropFilter(
+          filter: ui.ImageFilter.blur(sigmaX: 22, sigmaY: 22),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              borderRadius: shape,
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: thumb
+                    ? const [Color(0x806F747C), Color(0x40424750)]
+                    : const [Color(0xD032353B), Color(0xD9202228)],
+              ),
+            ),
+            child: CustomPaint(
+              foregroundPainter: _StaticGlassRim(radius: radius, thumb: thumb),
+              child: Material(type: MaterialType.transparency, child: child),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _StaticGlassRim extends CustomPainter {
+  const _StaticGlassRim({required this.radius, required this.thumb});
+
+  final double radius;
+  final bool thumb;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = (Offset.zero & size).deflate(.6);
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1
+      ..shader = LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          Colors.white.withValues(alpha: thumb ? .64 : .30),
+          Colors.white.withValues(alpha: .06),
+          Colors.white.withValues(alpha: thumb ? .23 : .13),
+        ],
+        stops: const [0, .55, 1],
+      ).createShader(rect);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(rect, Radius.circular(radius)),
+      paint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_StaticGlassRim oldDelegate) =>
+      oldDelegate.radius != radius || oldDelegate.thumb != thumb;
 }
 
 class _GlassRim extends CustomPainter {
