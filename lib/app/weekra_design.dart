@@ -43,6 +43,92 @@ abstract final class WeekraMotion {
   }
 }
 
+/// Adds the small, physical response shared by Weekra's clickable controls.
+///
+/// The control itself remains responsible for hover and focus colors. Keeping
+/// the scale in a wrapper means icon, text, and custom controls all compress in
+/// the same way without changing their hit targets.
+class WeekraPressableScale extends StatefulWidget {
+  const WeekraPressableScale({
+    super.key,
+    required this.child,
+    this.enabled = true,
+    this.pressedScale = .94,
+  });
+
+  final Widget child;
+  final bool enabled;
+  final double pressedScale;
+
+  @override
+  State<WeekraPressableScale> createState() => _WeekraPressableScaleState();
+}
+
+class _WeekraPressableScaleState extends State<WeekraPressableScale> {
+  bool _pressed = false;
+
+  void _setPressed(bool value) {
+    if (_pressed == value || !mounted) return;
+    setState(() => _pressed = value);
+  }
+
+  @override
+  void didUpdateWidget(WeekraPressableScale oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!widget.enabled && _pressed) _pressed = false;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: widget.enabled
+          ? SystemMouseCursors.click
+          : SystemMouseCursors.basic,
+      onExit: (_) => _setPressed(false),
+      child: Listener(
+        onPointerDown: widget.enabled ? (_) => _setPressed(true) : null,
+        onPointerUp: widget.enabled ? (_) => _setPressed(false) : null,
+        onPointerCancel: widget.enabled ? (_) => _setPressed(false) : null,
+        child: AnimatedScale(
+          scale: _pressed ? widget.pressedScale : 1,
+          duration: WeekraMotion.resolve(context, WeekraMotion.quick),
+          curve: WeekraMotion.standard,
+          child: widget.child,
+        ),
+      ),
+    );
+  }
+}
+
+/// Icon button with Weekra's shared hover color and press response.
+class WeekraIconButton extends StatelessWidget {
+  const WeekraIconButton({
+    super.key,
+    required this.icon,
+    required this.onPressed,
+    this.tooltip,
+    this.color,
+  });
+
+  final Widget icon;
+  final VoidCallback? onPressed;
+  final String? tooltip;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) {
+    return WeekraPressableScale(
+      enabled: onPressed != null,
+      child: IconButton(
+        onPressed: onPressed,
+        tooltip: tooltip,
+        color: color,
+        icon: icon,
+      ),
+    );
+  }
+}
+
 abstract final class WeekraMaterial {
   static const glass = Color(0xD91D1F22);
   static const glassStrong = Color(0xF2232529);
@@ -114,7 +200,11 @@ abstract final class WeekraDesign {
       scaffoldBackgroundColor: WeekraColors.canvas,
       canvasColor: WeekraColors.canvas,
       dividerColor: WeekraColors.divider,
-      splashFactory: InkRipple.splashFactory,
+      splashFactory: NoSplash.splashFactory,
+      hoverColor: WeekraColors.surfaceRaised,
+      highlightColor: WeekraColors.surfacePressed,
+      splashColor: Colors.transparent,
+      focusColor: WeekraColors.surfaceRaised,
       useMaterial3: true,
       iconTheme: const IconThemeData(
         color: WeekraColors.textSecondary,
@@ -162,38 +252,127 @@ abstract final class WeekraDesign {
             if (states.contains(WidgetState.disabled)) {
               return WeekraColors.textTertiary;
             }
+            if (states.contains(WidgetState.hovered) ||
+                states.contains(WidgetState.pressed) ||
+                states.contains(WidgetState.focused)) {
+              return WeekraColors.textPrimary;
+            }
             return WeekraColors.textSecondary;
           }),
-          overlayColor: const WidgetStatePropertyAll(
-            WeekraColors.surfacePressed,
-          ),
+          backgroundColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.disabled)) {
+              return Colors.transparent;
+            }
+            if (states.contains(WidgetState.pressed)) {
+              return WeekraColors.surfacePressed;
+            }
+            if (states.contains(WidgetState.hovered) ||
+                states.contains(WidgetState.focused)) {
+              return WeekraColors.surfaceRaised;
+            }
+            return Colors.transparent;
+          }),
+          overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+          animationDuration: WeekraMotion.quick,
         ),
       ),
       textButtonTheme: TextButtonThemeData(
-        style: TextButton.styleFrom(
-          minimumSize: const Size(0, WeekraMetrics.controlHeight),
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          shape: controlShape,
-          foregroundColor: WeekraColors.textSecondary,
-          textStyle: TextStyle(fontFamily: fontFamily,
-            fontSize: 13, fontWeight: FontWeight.w600),
+        style: ButtonStyle(
+          minimumSize: const WidgetStatePropertyAll(
+            Size(0, WeekraMetrics.controlHeight),
+          ),
+          padding: const WidgetStatePropertyAll(
+            EdgeInsets.symmetric(horizontal: 12),
+          ),
+          shape: const WidgetStatePropertyAll(controlShape),
+          foregroundColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.disabled)) {
+              return WeekraColors.textTertiary;
+            }
+            if (states.contains(WidgetState.hovered) ||
+                states.contains(WidgetState.pressed) ||
+                states.contains(WidgetState.focused)) {
+              return WeekraColors.textPrimary;
+            }
+            return WeekraColors.textSecondary;
+          }),
+          backgroundColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.pressed)) {
+              return WeekraColors.surfacePressed;
+            }
+            if (states.contains(WidgetState.hovered) ||
+                states.contains(WidgetState.focused)) {
+              return WeekraColors.surfaceRaised;
+            }
+            return Colors.transparent;
+          }),
+          overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+          animationDuration: WeekraMotion.quick,
+          textStyle: WidgetStatePropertyAll(
+            TextStyle(
+              fontFamily: fontFamily,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ),
       ),
       filledButtonTheme: FilledButtonThemeData(
-        style: FilledButton.styleFrom(
-          minimumSize: const Size(0, 46),
-          backgroundColor: resolvedAccent,
-          foregroundColor: WeekraColors.onAccent,
-          elevation: 0,
-          shape: controlShape,
+        style: ButtonStyle(
+          minimumSize: const WidgetStatePropertyAll(Size(0, 46)),
+          backgroundColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.disabled)) {
+              return WeekraColors.surfacePressed;
+            }
+            if (states.contains(WidgetState.pressed)) {
+              return Color.alphaBlend(
+                Colors.black.withValues(alpha: .14),
+                resolvedAccent,
+              );
+            }
+            if (states.contains(WidgetState.hovered) ||
+                states.contains(WidgetState.focused)) {
+              return Color.alphaBlend(
+                Colors.white.withValues(alpha: .10),
+                resolvedAccent,
+              );
+            }
+            return resolvedAccent;
+          }),
+          foregroundColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.disabled)) {
+              return WeekraColors.textTertiary;
+            }
+            return WeekraColors.onAccent;
+          }),
+          elevation: const WidgetStatePropertyAll(0),
+          shape: const WidgetStatePropertyAll(controlShape),
+          overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+          animationDuration: WeekraMotion.quick,
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
-        style: OutlinedButton.styleFrom(
-          minimumSize: const Size(0, 42),
-          foregroundColor: WeekraColors.textPrimary,
-          side: const BorderSide(color: WeekraColors.outline),
-          shape: controlShape,
+        style: ButtonStyle(
+          minimumSize: const WidgetStatePropertyAll(Size(0, 42)),
+          foregroundColor: const WidgetStatePropertyAll(
+            WeekraColors.textPrimary,
+          ),
+          backgroundColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.pressed)) {
+              return WeekraColors.surfacePressed;
+            }
+            if (states.contains(WidgetState.hovered) ||
+                states.contains(WidgetState.focused)) {
+              return WeekraColors.surfaceRaised;
+            }
+            return Colors.transparent;
+          }),
+          side: const WidgetStatePropertyAll(
+            BorderSide(color: WeekraColors.outline),
+          ),
+          shape: const WidgetStatePropertyAll(controlShape),
+          overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+          animationDuration: WeekraMotion.quick,
         ),
       ),
       floatingActionButtonTheme: FloatingActionButtonThemeData(

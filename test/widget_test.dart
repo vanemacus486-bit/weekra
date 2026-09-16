@@ -3,6 +3,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:weekra/app/weekra_design.dart';
 import 'package:weekra/app/weekra_app.dart';
 import 'package:weekra/features/calendar/data/calendar_event_store.dart';
 import 'package:weekra/features/calendar/domain/calendar_event.dart';
@@ -11,6 +12,69 @@ import 'package:weekra/features/settings/data/app_settings_store.dart';
 import 'package:weekra/features/settings/domain/app_settings.dart';
 
 void main() {
+  test('control theme distinguishes hover, press, and disabled states', () {
+    final theme = WeekraDesign.dark();
+    final iconStyle = theme.iconButtonTheme.style!;
+    expect(
+      iconStyle.backgroundColor!.resolve({WidgetState.hovered}),
+      WeekraColors.surfaceRaised,
+    );
+    expect(
+      iconStyle.backgroundColor!.resolve({WidgetState.pressed}),
+      WeekraColors.surfacePressed,
+    );
+    expect(
+      iconStyle.foregroundColor!.resolve({WidgetState.hovered}),
+      WeekraColors.textPrimary,
+    );
+    expect(
+      iconStyle.foregroundColor!.resolve({WidgetState.disabled}),
+      WeekraColors.textTertiary,
+    );
+
+    final textStyle = theme.textButtonTheme.style!;
+    expect(
+      textStyle.backgroundColor!.resolve({WidgetState.hovered}),
+      WeekraColors.surfaceRaised,
+    );
+    expect(
+      textStyle.backgroundColor!.resolve({WidgetState.pressed}),
+      WeekraColors.surfacePressed,
+    );
+  });
+
+  testWidgets('toolbar icon compresses while the pointer is down', (
+    tester,
+  ) async {
+    _useViewport(tester, const Size(1280, 800));
+    await tester.pumpWidget(
+      WeekraApp(
+        eventStore: _MemoryEventStore(),
+        locale: const Locale('en'),
+        enableAutomaticUpdates: false,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final control = find.byKey(const Key('open-settings'));
+    final scale = find.descendant(
+      of: control,
+      matching: find.byType(AnimatedScale),
+    );
+    expect(scale, findsOneWidget);
+
+    final pointer = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    await pointer.addPointer(location: tester.getCenter(control));
+    await pointer.down(tester.getCenter(control));
+    await tester.pump();
+    expect(tester.widget<AnimatedScale>(scale).scale, .94);
+
+    await pointer.up();
+    await tester.pumpAndSettle();
+    expect(tester.widget<AnimatedScale>(scale).scale, 1);
+    await pointer.removePointer();
+  });
+
   testWidgets('centers today and flows the visible dates one day at a time', (
     tester,
   ) async {

@@ -626,7 +626,7 @@ class _WeekToolbar extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               _ToolbarSurface(
-                child: IconButton(
+                child: WeekraIconButton(
                   key: const Key('open-settings'),
                   onPressed: onSettings,
                   tooltip: l10n.settingsTooltip,
@@ -691,14 +691,14 @@ class _WeekNavigation extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          IconButton(
+          WeekraIconButton(
             key: const Key('timeline-previous-day'),
             onPressed: onPrevious,
             tooltip: l10n.previousWeekTooltip,
             icon: const Icon(Icons.chevron_left_rounded, size: 20),
           ),
           if (compact)
-            IconButton(
+            WeekraIconButton(
               key: const Key('timeline-today'),
               onPressed: onToday,
               tooltip: l10n.today,
@@ -707,7 +707,7 @@ class _WeekNavigation extends StatelessWidget {
             )
           else
             _TodayButton(onPressed: onToday, label: l10n.today, color: accent),
-          IconButton(
+          WeekraIconButton(
             key: const Key('timeline-next-day'),
             onPressed: onNext,
             tooltip: l10n.nextWeekTooltip,
@@ -719,7 +719,7 @@ class _WeekNavigation extends StatelessWidget {
   }
 }
 
-class _TodayButton extends StatelessWidget {
+class _TodayButton extends StatefulWidget {
   const _TodayButton({
     required this.onPressed,
     required this.label,
@@ -731,33 +731,53 @@ class _TodayButton extends StatelessWidget {
   final Color color;
 
   @override
+  State<_TodayButton> createState() => _TodayButtonState();
+}
+
+class _TodayButtonState extends State<_TodayButton> {
+  bool _hovered = false;
+
+  @override
   Widget build(BuildContext context) {
-    return Semantics(
-      key: const Key('timeline-today'),
-      button: true,
-      label: label,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onPressed,
-          borderRadius: BorderRadius.circular(8),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(
-              minWidth: 58,
-              minHeight: WeekraMetrics.controlHeight,
-            ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              child: Center(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: color,
-                    fontSize: 13,
-                    height: 1.1,
-                    fontWeight: FontWeight.w600,
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: WeekraPressableScale(
+        child: Semantics(
+          key: const Key('timeline-today'),
+          button: true,
+          label: widget.label,
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: widget.onPressed,
+              hoverColor: Colors.transparent,
+              borderRadius: BorderRadius.circular(8),
+              child: AnimatedContainer(
+                duration: WeekraMotion.resolve(context, WeekraMotion.quick),
+                curve: WeekraMotion.standard,
+                constraints: const BoxConstraints(
+                  minWidth: 58,
+                  minHeight: WeekraMetrics.controlHeight,
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                decoration: BoxDecoration(
+                  color: _hovered
+                      ? WeekraColors.surfaceRaised
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Center(
+                  child: Text(
+                    widget.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: widget.color,
+                      fontSize: 13,
+                      height: 1.1,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ),
@@ -828,7 +848,7 @@ class _WeekLayoutSwitcher extends StatelessWidget {
   }
 }
 
-class _WeekLayoutOption extends StatelessWidget {
+class _WeekLayoutOption extends StatefulWidget {
   const _WeekLayoutOption({
     super.key,
     required this.icon,
@@ -845,59 +865,88 @@ class _WeekLayoutOption extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
+  State<_WeekLayoutOption> createState() => _WeekLayoutOptionState();
+}
+
+class _WeekLayoutOptionState extends State<_WeekLayoutOption> {
+  bool _hovered = false;
+
+  @override
   Widget build(BuildContext context) {
     final duration = WeekraMotion.resolve(context, WeekraMotion.control);
-    return Semantics(
-      button: true,
-      selected: selected,
-      label: semanticLabel,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          splashFactory: NoSplash.splashFactory,
-          borderRadius: BorderRadius.circular(8),
-          child: Container(
-            height: WeekraMetrics.controlHeight - 4,
-            margin: const EdgeInsets.all(2),
-            padding: EdgeInsetsDirectional.symmetric(
-              horizontal: label == null ? 9 : 10,
-            ),
-            child: TweenAnimationBuilder<double>(
-              tween: Tween(end: selected ? 1 : 0),
-              duration: duration,
-              curve: WeekraMotion.standard,
-              builder: (context, value, child) {
-                final contentColor = Color.lerp(_mutedInk, _ink, value)!;
-                return Row(
-                  mainAxisSize: MainAxisSize.min,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(icon, size: 17, color: contentColor),
-                    if (label != null) ...[
-                      const SizedBox(width: 6),
-                      Flexible(
-                        child: Text(
-                          label!,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: contentColor,
-                            fontSize: 12,
-                            height: 1.15,
-                            fontWeight: FontWeight.lerp(
-                              FontWeight.w500,
-                              FontWeight.w700,
-                              value,
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: WeekraPressableScale(
+        child: Semantics(
+          button: true,
+          selected: widget.selected,
+          label: widget.semanticLabel,
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: widget.onTap,
+              hoverColor: Colors.transparent,
+              splashFactory: NoSplash.splashFactory,
+              borderRadius: BorderRadius.circular(8),
+              child: AnimatedContainer(
+                duration: WeekraMotion.resolve(context, WeekraMotion.quick),
+                curve: WeekraMotion.standard,
+                height: WeekraMetrics.controlHeight - 4,
+                margin: const EdgeInsets.all(2),
+                padding: EdgeInsetsDirectional.symmetric(
+                  horizontal: widget.label == null ? 9 : 10,
+                ),
+                decoration: BoxDecoration(
+                  color: _hovered
+                      ? WeekraColors.surfaceRaised.withValues(
+                          alpha: widget.selected ? .28 : .82,
+                        )
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: TweenAnimationBuilder<double>(
+                  tween: Tween(end: widget.selected ? 1 : 0),
+                  duration: duration,
+                  curve: WeekraMotion.standard,
+                  builder: (context, value, child) {
+                    final hoverValue = _hovered ? 1.0 : value;
+                    final contentColor = Color.lerp(
+                      _mutedInk,
+                      _ink,
+                      hoverValue,
+                    )!;
+                    return Row(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(widget.icon, size: 17, color: contentColor),
+                        if (widget.label != null) ...[
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              widget.label!,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: contentColor,
+                                fontSize: 12,
+                                height: 1.15,
+                                fontWeight: FontWeight.lerp(
+                                  FontWeight.w500,
+                                  FontWeight.w700,
+                                  value,
+                                ),
+                              ),
                             ),
                           ),
-                        ),
-                      ),
-                    ],
-                  ],
-                );
-              },
+                        ],
+                      ],
+                    );
+                  },
+                ),
+              ),
             ),
           ),
         ),
@@ -3962,7 +4011,7 @@ class _EventEditorSheetState extends State<_EventEditorSheet> {
                         const Spacer(),
                       KeyedSubtree(
                         key: const Key('close-event-editor'),
-                        child: IconButton(
+                        child: WeekraIconButton(
                           key: const Key('cancel-event-editor'),
                           onPressed: _isSaving ? null : _cancel,
                           tooltip: l10n.closeTooltip,
@@ -4562,7 +4611,7 @@ class _EventDetailsSheet extends StatelessWidget {
                     ),
                   ),
                 ),
-                IconButton(
+                WeekraIconButton(
                   onPressed: () => Navigator.of(context).pop(),
                   tooltip: l10n.closeTooltip,
                   icon: const Icon(Icons.close_rounded),

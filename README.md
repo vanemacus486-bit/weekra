@@ -77,6 +77,8 @@ The first UI slice is in place:
 - System-driven English and Simplified Chinese UI
 - Centered glass settings card with instant calendar anchoring, category
   names/colors, theme/language changes, and update status
+- Rounded hover surfaces, distinct pressed colors, and restrained press motion
+  across toolbar, dialog, and settings controls
 - Pseudo-localization plus small-screen and large-type layout tests
 
 Direct event manipulation uses 15-minute snapping, tactile feedback, and live
