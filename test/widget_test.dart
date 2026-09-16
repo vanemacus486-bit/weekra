@@ -373,7 +373,7 @@ void main() {
     _useViewport(tester, const Size(600, 400));
     await tester.pumpWidget(
       MaterialApp(
-        theme: WeekraDesign.dark(),
+        theme: WeekraDesign.dark().copyWith(platform: TargetPlatform.windows),
         home: const Center(
           child: GlassSurface(
             key: Key('responsive-glass-test'),

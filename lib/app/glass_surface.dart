@@ -49,21 +49,31 @@ class _GlassSurfaceState extends State<GlassSurface> {
   Widget build(BuildContext context) {
     final shape = BorderRadius.circular(widget.radius);
     final duration = WeekraMotion.resolve(context, WeekraMotion.control);
-    final accent = Theme.of(context).colorScheme.primary;
-    final targetLight = widget.responsive && _hovered
+    final theme = Theme.of(context);
+    final accent = theme.colorScheme.primary;
+    final desktop = switch (theme.platform) {
+      TargetPlatform.windows ||
+      TargetPlatform.macOS ||
+      TargetPlatform.linux => true,
+      TargetPlatform.android ||
+      TargetPlatform.iOS ||
+      TargetPlatform.fuchsia => false,
+    };
+    final pointerResponsive = widget.responsive && desktop;
+    final targetLight = pointerResponsive && _hovered
         ? _pointerLight
         : _restingLight;
     return MouseRegion(
-      onEnter: widget.responsive
+      onEnter: pointerResponsive
           ? (event) {
               _updateLight(event.localPosition);
               setState(() => _hovered = true);
             }
           : null,
-      onHover: widget.responsive
+      onHover: pointerResponsive
           ? (event) => _updateLight(event.localPosition)
           : null,
-      onExit: widget.responsive
+      onExit: pointerResponsive
           ? (_) => setState(() => _hovered = false)
           : null,
       child: AnimatedContainer(
@@ -80,7 +90,7 @@ class _GlassSurfaceState extends State<GlassSurface> {
               spreadRadius: widget.thumb ? -.5 : -2,
               offset: Offset(0, widget.thumb ? 3 : (_hovered ? 14 : 11)),
             ),
-            if (!widget.thumb)
+            if (!widget.thumb && desktop)
               BoxShadow(
                 color: accent.withValues(alpha: _hovered ? .045 : .025),
                 blurRadius: _hovered ? 22 : 16,
@@ -92,8 +102,8 @@ class _GlassSurfaceState extends State<GlassSurface> {
           borderRadius: shape,
           child: BackdropFilter(
             filter: ui.ImageFilter.blur(
-              sigmaX: widget.thumb ? 18 : 24,
-              sigmaY: widget.thumb ? 18 : 24,
+              sigmaX: widget.thumb ? (desktop ? 18 : 14) : (desktop ? 24 : 18),
+              sigmaY: widget.thumb ? (desktop ? 18 : 14) : (desktop ? 24 : 18),
             ),
             child: TweenAnimationBuilder<Alignment>(
               tween: Tween<Alignment>(end: targetLight),
