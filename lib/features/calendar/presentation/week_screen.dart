@@ -1238,6 +1238,9 @@ class _WeekHourlyLayoutState extends State<_WeekHourlyLayout> {
   final _gridKey = GlobalKey();
   final _draftAnchorKey = GlobalKey();
   final _focusNode = FocusNode(debugLabel: 'Week hourly interactions');
+  late List<CalendarEvent> _cachedAllDayEvents;
+  late List<_EventPlacement> _cachedTimedPlacements;
+  late Map<String, CalendarEvent> _cachedEventsById;
   CalendarEvent? _draftEvent;
   CalendarEvent? _movingEvent;
   CalendarEvent? _resizeOrigin;
@@ -1250,6 +1253,13 @@ class _WeekHourlyLayoutState extends State<_WeekHourlyLayout> {
   int? _focusMinute;
   bool _editingDraft = false;
   bool _discardingDraft = false;
+  int _draftSession = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _refreshEventLayoutCache();
+  }
 
   @override
   void dispose() {
@@ -1260,11 +1270,37 @@ class _WeekHourlyLayoutState extends State<_WeekHourlyLayout> {
   @override
   void didUpdateWidget(covariant _WeekHourlyLayout oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.events, widget.events) ||
+        _dateKey(oldWidget.days.first) != _dateKey(widget.days.first)) {
+      _refreshEventLayoutCache();
+    }
     if (_selectedEventId != null &&
         !widget.events.any((event) => event.id == _selectedEventId)) {
       _selectedEventId = null;
       _focusMinute = null;
     }
+  }
+
+  void _refreshEventLayoutCache() {
+    _cachedEventsById = {for (final event in widget.events) event.id: event};
+    _cachedAllDayEvents = widget.events
+        .where(_isAllDayEvent)
+        .toList(growable: false);
+    final timedSegments = widget.events
+        .where((event) => !_isAllDayEvent(event))
+        .expand((event) => _timedEventSegments(event, widget.days.first));
+    _cachedTimedPlacements = _eventPlacements(timedSegments);
+  }
+
+  List<_EventPlacement> _displayedTimedPlacements() {
+    if (_movingEvent == null && _resizingEvent == null) {
+      return _cachedTimedPlacements;
+    }
+    final timedSegments = widget.events
+        .where((event) => !_isAllDayEvent(event))
+        .map(_displayEvent)
+        .expand((event) => _timedEventSegments(event, widget.days.first));
+    return _eventPlacements(timedSegments);
   }
 
   Offset? _gridPosition(Offset globalPosition) {
@@ -1289,6 +1325,7 @@ class _WeekHourlyLayoutState extends State<_WeekHourlyLayout> {
     final position = _gridPosition(globalPosition);
     if (position == null || position.dx < gutterWidth) {
       setState(() {
+        _draftSession++;
         _draftEvent = null;
         _selectedEventId = null;
         _focusMinute = null;
@@ -1312,8 +1349,12 @@ class _WeekHourlyLayoutState extends State<_WeekHourlyLayout> {
     final start = _dateAtMinute(day, minute);
 
     setState(() {
+      _draftSession++;
       _selectedEventId = null;
-      _focusMinute = minute;
+      // Creating a draft must not reshape the entire 24-hour timeline. The
+      // uniform scale keeps every existing event stationary and makes the
+      // first preview frame cheap enough to feel immediate.
+      _focusMinute = null;
       _draftEvent = CalendarEvent(
         id: '_draft',
         title: '',
@@ -1397,12 +1438,19 @@ class _WeekHourlyLayoutState extends State<_WeekHourlyLayout> {
     if (draft == null || _editingDraft) {
       return;
     }
+    final session = _draftSession;
     setState(() {
       _editingDraft = true;
       _discardingDraft = false;
     });
     await WidgetsBinding.instance.endOfFrame;
-    if (!mounted || _draftEvent == null) {
+    if (!mounted) {
+      return;
+    }
+    if (_draftSession != session || _draftEvent == null) {
+      if (_editingDraft) {
+        setState(() => _editingDraft = false);
+      }
       return;
     }
     final anchorRect = _globalRectFor(_draftAnchorKey.currentContext);
@@ -1411,7 +1459,7 @@ class _WeekHourlyLayoutState extends State<_WeekHourlyLayout> {
       end: draft.end,
       anchorRect: anchorRect,
     );
-    if (!mounted) {
+    if (!mounted || _draftSession != session) {
       return;
     }
     if (_draftEvent == null) {
@@ -1420,6 +1468,7 @@ class _WeekHourlyLayoutState extends State<_WeekHourlyLayout> {
     }
     if (saved) {
       setState(() {
+        _draftSession++;
         _draftEvent = null;
         _editingDraft = false;
         _focusMinute = null;
@@ -1437,7 +1486,11 @@ class _WeekHourlyLayoutState extends State<_WeekHourlyLayout> {
     if (!mounted) {
       return;
     }
+    if (_draftSession != session) {
+      return;
+    }
     setState(() {
+      _draftSession++;
       _draftEvent = null;
       _discardingDraft = false;
       _focusMinute = null;
@@ -1447,6 +1500,7 @@ class _WeekHourlyLayoutState extends State<_WeekHourlyLayout> {
   void _selectEvent(CalendarEvent event) {
     _focusNode.requestFocus();
     setState(() {
+      _draftSession++;
       _draftEvent = null;
       _selectedEventId = event.id;
       _focusMinute = (event.startMinutes + event.endMinutes) ~/ 2;
@@ -1457,6 +1511,7 @@ class _WeekHourlyLayoutState extends State<_WeekHourlyLayout> {
   void _startMoving(CalendarEvent event) {
     _focusNode.requestFocus();
     setState(() {
+      _draftSession++;
       _draftEvent = null;
       _selectedEventId = event.id;
       _focusMinute = (event.startMinutes + event.endMinutes) ~/ 2;
@@ -1547,6 +1602,7 @@ class _WeekHourlyLayoutState extends State<_WeekHourlyLayout> {
   void _startResizing(CalendarEvent event, _ResizeEdge edge) {
     _focusNode.requestFocus();
     setState(() {
+      _draftSession++;
       _draftEvent = null;
       _selectedEventId = event.id;
       _movingEvent = null;
@@ -1641,6 +1697,7 @@ class _WeekHourlyLayoutState extends State<_WeekHourlyLayout> {
     }
     final draftOrigin = _resizeOrigin?.id == '_draft' ? _resizeOrigin : null;
     setState(() {
+      _draftSession++;
       _draftEvent = draftOrigin;
       _movingEvent = null;
       _resizeOrigin = null;
@@ -1654,6 +1711,31 @@ class _WeekHourlyLayoutState extends State<_WeekHourlyLayout> {
       _selectedEventId = null;
       _focusMinute = null;
     });
+  }
+
+  bool _consumeGridTapToCancelDraft() {
+    // A click outside an active draft is a cancellation gesture. It must not
+    // fall through and become the starting click of another event.
+    if (_editingDraft) {
+      return true;
+    }
+    if (_draftEvent == null && !_discardingDraft) {
+      return false;
+    }
+    setState(() {
+      _draftSession++;
+      _draftEvent = null;
+      _resizeOrigin = null;
+      _resizingEvent = null;
+      _resizeEdge = null;
+      _lastFeedbackStep = null;
+      _createAnchorDayIndex = null;
+      _createAnchorMinute = null;
+      _discardingDraft = false;
+      _selectedEventId = null;
+      _focusMinute = null;
+    });
+    return true;
   }
 
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
@@ -1695,16 +1777,8 @@ class _WeekHourlyLayoutState extends State<_WeekHourlyLayout> {
         builder: (context, constraints) {
           final narrow = constraints.maxWidth < 900;
           final desktopPointers = _usesDesktopPointerRules(context);
-          final allDayEvents = widget.events
-              .where(_isAllDayEvent)
-              .toList(growable: false);
-          final timedEvents = widget.events
-              .where((event) => !_isAllDayEvent(event))
-              .toList(growable: false);
-          final displayedTimedEvents = timedEvents
-              .map(_displayEvent)
-              .expand((event) => _timedEventSegments(event, widget.days.first))
-              .toList(growable: false);
+          final allDayEvents = _cachedAllDayEvents;
+          final displayedTimedPlacements = _displayedTimedPlacements();
           const startHour = 0;
           const endHour = 24;
           final allDayCount = List.generate(
@@ -1799,6 +1873,9 @@ class _WeekHourlyLayoutState extends State<_WeekHourlyLayout> {
                       behavior: HitTestBehavior.opaque,
                       dragStartBehavior: DragStartBehavior.down,
                       onTapUp: (details) {
+                        if (_consumeGridTapToCancelDraft()) {
+                          return;
+                        }
                         _selectNewSlot(
                           details.globalPosition,
                           gutterWidth: gutterWidth,
@@ -1922,19 +1999,15 @@ class _WeekHourlyLayoutState extends State<_WeekHourlyLayout> {
                                             ),
                                           ),
                                         ),
-                                      for (final placement in _eventPlacements(
-                                        displayedTimedEvents,
-                                      ))
+                                      for (final placement
+                                          in displayedTimedPlacements)
                                         Builder(
                                           builder: (context) {
                                             final displayedEvent =
                                                 placement.event;
-                                            final originalEvent = widget.events
-                                                .firstWhere(
-                                                  (event) =>
-                                                      event.id ==
-                                                      displayedEvent.id,
-                                                );
+                                            final originalEvent =
+                                                _cachedEventsById[displayedEvent
+                                                    .id]!;
                                             final displayedOriginal =
                                                 _displayEvent(originalEvent);
                                             final isLeadingSegment =
@@ -4739,7 +4812,12 @@ class _FloatingCardSurface extends StatelessWidget {
   const _FloatingCardSurface({required this.child});
   final Widget child;
   @override
-  Widget build(BuildContext context) => GlassSurface(child: child);
+  Widget build(BuildContext context) => GlassSurface(
+    // Dialog-sized blur should stay composited instead of rebuilding for every
+    // mouse move while the user is typing or choosing a time.
+    responsive: false,
+    child: child,
+  );
 }
 
 class _AnchoredCardLayout extends StatelessWidget {

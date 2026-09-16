@@ -32,12 +32,13 @@ the response stays anchored to the control. Press motion becomes instantaneous
 when the operating system requests reduced animation.
 
 Glass light starts at the upper-left edge and follows the pointer within the
-surface on desktop. Base tint, top-to-bottom transmission, local specular
-light, outer rim, inner edge, and shadow are separate layers. Touch platforms
-retain the validated static frosted profile instead of paying for pointer-only
-lighting. The selected segmented thumb stays brighter but does not run a second
-pointer response inside its parent. When reduced motion is enabled, light and
-shadow changes settle immediately.
+surface on compact desktop controls. Dialog-sized surfaces keep the same base
+tint, transmission, rim, and shadow layers but use static lighting so mouse
+movement cannot continuously rebuild an editor while the user is typing. Touch
+platforms retain the validated static frosted profile instead of paying for
+pointer-only lighting. The selected segmented thumb stays brighter but does not
+run a second pointer response inside its parent. When reduced motion is enabled,
+light and shadow changes settle immediately.
 
 ## Update delivery
 

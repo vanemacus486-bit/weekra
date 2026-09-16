@@ -68,6 +68,9 @@ The first UI slice is in place:
 - Timepage-style direct manipulation in Hourly view: click for a one-hour event
   aligned to the containing hour, or drag with 15-minute precision; press and
   drag the event body to move, or hover and pull either edge to resize
+- Draft creation keeps the 24-hour timeline at its current scale, reuses cached
+  event placement, and treats the first surrounding click as cancel instead of
+  creating a second event
 - Compact right-click menu for editing, copying, deleting, or recategorizing
   an event without opening its details first
 - A visible 24:00 label and bottom rule keep the full-day boundary explicit
@@ -80,7 +83,8 @@ The first UI slice is in place:
 - Rounded hover surfaces, distinct pressed colors, and restrained press motion
   across toolbar, dialog, and settings controls
 - Layered glass surfaces with lighter tinting, dual-edge definition, and a
-  restrained highlight that follows the pointer on desktop
+  restrained highlight that follows the pointer on compact desktop controls;
+  dialog-sized glass stays static to avoid high-frequency repainting
 - Pseudo-localization plus small-screen and large-type layout tests
 
 Direct event manipulation uses 15-minute snapping, tactile feedback, and live

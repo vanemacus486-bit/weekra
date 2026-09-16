@@ -1023,6 +1023,82 @@ void main() {
     _restoreTestPlatform();
   });
 
+  testWidgets('draft creation keeps the 24-hour scale and events stationary', (
+    tester,
+  ) async {
+    _useViewport(tester, const Size(1280, 800));
+    _useDesktopPlatform();
+    final store = _MemoryEventStore([
+      _eventAtStartOfWeek('Stable during creation'),
+    ]);
+    await tester.pumpWidget(
+      WeekraApp(
+        eventStore: store,
+        locale: const Locale('en'),
+        enableAutomaticUpdates: false,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final existing = find.byKey(
+      const Key('hourly-event-Stable during creation'),
+    );
+    final before = tester.getRect(existing);
+    final grid = tester.getRect(find.byKey(const Key('week-hourly-grid')));
+    await tester.tapAt(
+      Offset(grid.left + grid.width * .72, grid.top + grid.height * .43),
+      kind: PointerDeviceKind.mouse,
+    );
+    await tester.pumpAndSettle();
+
+    final after = tester.getRect(existing);
+    expect(find.byKey(const Key('draft-event')), findsOneWidget);
+    expect(find.byKey(const Key('timeline-focus-lens')), findsNothing);
+    expect(after.top, closeTo(before.top, .1));
+    expect(after.height, closeTo(before.height, .1));
+
+    await tester.tap(find.byKey(const Key('cancel-event-editor')));
+    await tester.pumpAndSettle();
+    _restoreTestPlatform();
+  });
+
+  testWidgets(
+    'clicking the grid around an editor cancels without fallthrough',
+    (tester) async {
+      _useViewport(tester, const Size(900, 760));
+      _useDesktopPlatform();
+      final store = _MemoryEventStore();
+      await tester.pumpWidget(
+        WeekraApp(
+          eventStore: store,
+          locale: const Locale('en'),
+          enableAutomaticUpdates: false,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final grid = tester.getRect(find.byKey(const Key('week-hourly-grid')));
+      await tester.tapAt(
+        Offset(grid.left + grid.width * .22, grid.top + grid.height * .32),
+        kind: PointerDeviceKind.mouse,
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('draft-event')), findsOneWidget);
+      expect(find.byKey(const Key('cancel-event-editor')), findsOneWidget);
+
+      await tester.tapAt(
+        Offset(grid.right - 12, grid.bottom - 30),
+        kind: PointerDeviceKind.mouse,
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('cancel-event-editor')), findsNothing);
+      expect(find.byKey(const Key('draft-event')), findsNothing);
+      expect(store.savedEvents, isEmpty);
+      _restoreTestPlatform();
+    },
+  );
+
   testWidgets('creates an event by dragging an empty desktop time range', (
     tester,
   ) async {

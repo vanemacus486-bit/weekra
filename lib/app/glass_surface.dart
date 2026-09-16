@@ -117,7 +117,13 @@ class _GlassSurfaceState extends State<GlassSurface> {
               tween: Tween<Alignment>(end: targetLight),
               duration: duration,
               curve: WeekraMotion.standard,
-              builder: (context, light, _) => Stack(
+              child: RepaintBoundary(
+                child: Material(
+                  type: MaterialType.transparency,
+                  child: widget.child,
+                ),
+              ),
+              builder: (context, light, child) => Stack(
                 children: [
                   Positioned.fill(
                     child: DecoratedBox(
@@ -183,10 +189,7 @@ class _GlassSurfaceState extends State<GlassSurface> {
                       light: light,
                       hovered: _hovered,
                     ),
-                    child: Material(
-                      type: MaterialType.transparency,
-                      child: widget.child,
-                    ),
+                    child: child,
                   ),
                 ],
               ),
@@ -241,7 +244,9 @@ class _StaticGlassSurface extends StatelessWidget {
             ),
             child: CustomPaint(
               foregroundPainter: _StaticGlassRim(radius: radius, thumb: thumb),
-              child: Material(type: MaterialType.transparency, child: child),
+              child: RepaintBoundary(
+                child: Material(type: MaterialType.transparency, child: child),
+              ),
             ),
           ),
         ),
@@ -490,7 +495,7 @@ Future<T?> showGlassDialog<T>(
       child: Center(
         child: ConstrainedBox(
           constraints: BoxConstraints(maxWidth: maxWidth, maxHeight: maxHeight),
-          child: GlassSurface(child: builder(context)),
+          child: GlassSurface(responsive: false, child: builder(context)),
         ),
       ),
     ),
