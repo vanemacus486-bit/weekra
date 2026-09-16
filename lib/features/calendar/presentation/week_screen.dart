@@ -1187,9 +1187,7 @@ class _AgendaDay extends StatelessWidget {
               key: const Key('overview-day-column'),
               width: WeekraMetrics.dayColumnWidth,
               padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
-              color: isToday
-                  ? WeekraColors.dayStripToday
-                  : WeekraColors.dayStrip,
+              color: WeekraColors.dayStrip,
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -1216,7 +1214,7 @@ class _AgendaDay extends StatelessWidget {
                       color: isToday ? accent : _ink,
                       fontSize: 20,
                       height: 1.15,
-                      fontWeight: isToday ? FontWeight.w700 : FontWeight.w500,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                 ],

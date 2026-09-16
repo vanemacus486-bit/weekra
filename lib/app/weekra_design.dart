@@ -22,9 +22,8 @@ abstract final class WeekraColors {
   static const overviewSurface = Color(0xFF16181B);
 
   /// The day strip sits deeper than the event area, the way a dark margin sits
-  /// beside a lighter page. Today lifts above the other days.
+  /// beside a lighter page. Today is marked by ink colour alone.
   static const dayStrip = Color(0xFF0B0C0E);
-  static const dayStripToday = Color(0xFF171A1F);
 
   /// Unbooked stretches between two events sink below [overviewSurface] so free
   /// time stays visible at a glance.
