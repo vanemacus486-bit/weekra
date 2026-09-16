@@ -573,110 +573,140 @@ Future<_CategoryEditorResult?> _showCategoryEditor(
   required String categoryId,
   required String initialName,
   required Color initialColor,
-}) async {
-  final controller = TextEditingController(text: initialName);
-  var selectedColor = initialColor;
-  final result = await showGlassDialog<_CategoryEditorResult>(
+}) {
+  return showGlassDialog<_CategoryEditorResult>(
     context,
     maxWidth: 420,
     maxHeight: 520,
-    builder: (dialogContext) => StatefulBuilder(
-      builder: (context, setDialogState) {
-        final l10n = AppLocalizations.of(context);
-        final canSave = controller.text.trim().isNotEmpty;
-        return Material(
-          color: Colors.transparent,
-          child: SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(24, 20, 24, 22),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+    builder: (dialogContext) => _CategoryEditorDialog(
+      categoryId: categoryId,
+      initialName: initialName,
+      initialColor: initialColor,
+    ),
+  );
+}
+
+class _CategoryEditorDialog extends StatefulWidget {
+  const _CategoryEditorDialog({
+    required this.categoryId,
+    required this.initialName,
+    required this.initialColor,
+  });
+
+  final String categoryId;
+  final String initialName;
+  final Color initialColor;
+
+  @override
+  State<_CategoryEditorDialog> createState() => _CategoryEditorDialogState();
+}
+
+class _CategoryEditorDialogState extends State<_CategoryEditorDialog> {
+  late final TextEditingController _controller;
+  late Color _selectedColor;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialName);
+    _selectedColor = widget.initialColor;
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final canSave = _controller.text.trim().isNotEmpty;
+    return Material(
+      color: Colors.transparent,
+      child: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(24, 20, 24, 22),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          l10n.settingsEditCategory,
-                          style: Theme.of(context).textTheme.headlineSmall,
-                        ),
-                      ),
-                      IconButton(
-                        tooltip: l10n.closeTooltip,
-                        onPressed: () => Navigator.pop(dialogContext),
-                        icon: const Icon(Icons.close_rounded),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 18),
-                  TextField(
-                    key: Key('category-name-field-$categoryId'),
-                    controller: controller,
-                    autofocus: true,
-                    maxLength: 18,
-                    onChanged: (_) => setDialogState(() {}),
-                    decoration: InputDecoration(
-                      labelText: l10n.settingsCategoryName,
+                  Expanded(
+                    child: Text(
+                      l10n.settingsEditCategory,
+                      style: Theme.of(context).textTheme.headlineSmall,
                     ),
                   ),
-                  const SizedBox(height: 10),
-                  Text(
-                    l10n.settingsCategoryColor,
-                    style: Theme.of(context).textTheme.titleSmall,
-                  ),
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 12,
-                    runSpacing: 12,
-                    children: [
-                      for (
-                        var index = 0;
-                        index < _categoryPalette.length;
-                        index++
-                      )
-                        _CategoryColorChoice(
-                          key: Key('category-color-choice-$index'),
-                          color: _categoryPalette[index],
-                          selected:
-                              _categoryPalette[index].toARGB32() ==
-                              selectedColor.toARGB32(),
-                          onTap: () => setDialogState(
-                            () => selectedColor = _categoryPalette[index],
-                          ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 26),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(dialogContext),
-                        child: Text(l10n.cancel),
-                      ),
-                      const SizedBox(width: 10),
-                      FilledButton(
-                        key: const Key('save-category-settings'),
-                        onPressed: canSave
-                            ? () => Navigator.pop(dialogContext, (
-                                name: controller.text.trim(),
-                                color: selectedColor,
-                              ))
-                            : null,
-                        child: Text(l10n.saveChanges),
-                      ),
-                    ],
+                  IconButton(
+                    tooltip: l10n.closeTooltip,
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close_rounded),
                   ),
                 ],
               ),
-            ),
+              const SizedBox(height: 18),
+              TextField(
+                key: Key('category-name-field-${widget.categoryId}'),
+                controller: _controller,
+                autofocus: true,
+                maxLength: 18,
+                onChanged: (_) => setState(() {}),
+                decoration: InputDecoration(
+                  labelText: l10n.settingsCategoryName,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                l10n.settingsCategoryColor,
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  for (var index = 0; index < _categoryPalette.length; index++)
+                    _CategoryColorChoice(
+                      key: Key('category-color-choice-$index'),
+                      color: _categoryPalette[index],
+                      selected:
+                          _categoryPalette[index].toARGB32() ==
+                          _selectedColor.toARGB32(),
+                      onTap: () => setState(
+                        () => _selectedColor = _categoryPalette[index],
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 26),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: Text(l10n.cancel),
+                  ),
+                  const SizedBox(width: 10),
+                  FilledButton(
+                    key: const Key('save-category-settings'),
+                    onPressed: canSave
+                        ? () => Navigator.pop(context, (
+                            name: _controller.text.trim(),
+                            color: _selectedColor,
+                          ))
+                        : null,
+                    child: Text(l10n.saveChanges),
+                  ),
+                ],
+              ),
+            ],
           ),
-        );
-      },
-    ),
-  );
-  controller.dispose();
-  return result;
+        ),
+      ),
+    );
+  }
 }
 
 class _CategoryColorChoice extends StatelessWidget {
