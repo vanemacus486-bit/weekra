@@ -366,6 +366,13 @@ class _WeekScreenState extends State<WeekScreen> {
           (event) => _eventWithResolvedCategory(event, widget.categorySettings),
         )
         .toList();
+    // The overview is a continuous stream rather than one week, so it receives
+    // every event instead of the current week's slice.
+    final allEvents = _events
+        .map(
+          (event) => _eventWithResolvedCategory(event, widget.categorySettings),
+        )
+        .toList();
 
     return CallbackShortcuts(
       bindings: {
@@ -440,8 +447,7 @@ class _WeekScreenState extends State<WeekScreen> {
                             ),
                             overview: _WeekGridSummary(
                               key: const PageStorageKey('overview-week-view'),
-                              days: days,
-                              events: events,
+                              events: allEvents,
                               today: now,
                               onEventTap: _openEvent,
                               onCreate: (day) => _createEvent(
@@ -955,44 +961,125 @@ class _WeekLayoutOptionState extends State<_WeekLayoutOption> {
   }
 }
 
-class _WeekGridSummary extends StatelessWidget {
+/// The overview agenda.
+///
+/// It is a continuous day stream rather than a single week: the reader can keep
+/// scrolling past either end, and the list grows as they approach an edge.
+class _WeekGridSummary extends StatefulWidget {
   const _WeekGridSummary({
     super.key,
-    required this.days,
-    required this.events,
     required this.today,
+    required this.events,
     required this.onEventTap,
     required this.onCreate,
   });
 
-  final List<DateTime> days;
-  final List<CalendarEvent> events;
   final DateTime today;
+  final List<CalendarEvent> events;
   final _OpenEventCallback onEventTap;
   final ValueChanged<DateTime> onCreate;
 
   @override
+  State<_WeekGridSummary> createState() => _WeekGridSummaryState();
+}
+
+class _WeekGridSummaryState extends State<_WeekGridSummary> {
+  /// Days rendered on each side of today to begin with.
+  static const _initialDays = 45;
+
+  /// Days added every time the reader gets close to an end.
+  static const _extendStep = 45;
+
+  /// How close to an end triggers the next extension, in pixels.
+  static const _extendThreshold = 600.0;
+
+  static const _todayAnchorKey = Key('overview-today-anchor');
+  static const _bottomInset = 92.0;
+
+  late int _pastDays;
+  late int _futureDays;
+
+  @override
+  void initState() {
+    super.initState();
+    _pastDays = _initialDays;
+    _futureDays = _initialDays;
+  }
+
+  DateTime get _origin => DateUtils.dateOnly(widget.today);
+
+  int _dayKey(DateTime day) => day.year * 10000 + day.month * 100 + day.day;
+
+  bool _handleScroll(ScrollNotification notification) {
+    final metrics = notification.metrics;
+    if (!metrics.hasPixels) {
+      return false;
+    }
+    final extendPast = metrics.extentBefore < _extendThreshold;
+    final extendFuture = metrics.extentAfter < _extendThreshold;
+    if (!extendPast && !extendFuture) {
+      return false;
+    }
+    setState(() {
+      if (extendPast) _pastDays += _extendStep;
+      if (extendFuture) _futureDays += _extendStep;
+    });
+    return false;
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final agenda = ListView.separated(
-      key: const Key('week-grid-layout'),
-      padding: const EdgeInsetsDirectional.fromSTEB(18, 4, 18, 92),
-      itemCount: days.length,
-      separatorBuilder: (context, index) => const SizedBox(height: 8),
-      itemBuilder: (context, dayIndex) {
-        final day = days[dayIndex];
-        final dayEvents =
-            events
-                .where((event) => event.dayIndexIn(days.first) == dayIndex)
-                .toList()
-              ..sort((a, b) => a.startMinutes.compareTo(b.startMinutes));
-        return _AgendaDay(
-          day: day,
-          events: dayEvents,
-          isToday: _isSameDay(day, today),
-          onEventTap: onEventTap,
-          onCreate: onCreate,
-        );
-      },
+    final byDay = <int, List<CalendarEvent>>{};
+    for (final event in widget.events) {
+      byDay.putIfAbsent(_dayKey(event.start), () => []).add(event);
+    }
+    for (final dayEvents in byDay.values) {
+      dayEvents.sort((a, b) => a.startMinutes.compareTo(b.startMinutes));
+    }
+
+    Widget dayRow({
+      required DateTime day,
+      required bool showTopRule,
+    }) {
+      return _AgendaDay(
+        day: day,
+        events: byDay[_dayKey(day)] ?? const <CalendarEvent>[],
+        isToday: _isSameDay(day, widget.today),
+        showTopRule: showTopRule,
+        onEventTap: widget.onEventTap,
+        onCreate: widget.onCreate,
+      );
+    }
+
+    final agenda = ColoredBox(
+      color: WeekraColors.overviewSurface,
+      child: NotificationListener<ScrollNotification>(
+        onNotification: _handleScroll,
+        child: CustomScrollView(
+          key: const Key('week-grid-layout'),
+          center: _todayAnchorKey,
+          slivers: [
+            SliverList(
+              delegate: SliverChildBuilderDelegate((context, index) {
+                return dayRow(
+                  day: _origin.subtract(Duration(days: index + 1)),
+                  showTopRule: true,
+                );
+              }, childCount: _pastDays),
+            ),
+            SliverList(
+              key: _todayAnchorKey,
+              delegate: SliverChildBuilderDelegate((context, index) {
+                return dayRow(
+                  day: _origin.add(Duration(days: index)),
+                  showTopRule: index > 0,
+                );
+              }, childCount: _futureDays),
+            ),
+            const SliverToBoxAdapter(child: SizedBox(height: _bottomInset)),
+          ],
+        ),
+      ),
     );
 
     return LayoutBuilder(
@@ -1004,7 +1091,7 @@ class _WeekGridSummary extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Expanded(flex: 11, child: agenda),
-            Expanded(flex: 9, child: _TodayPanel(today: today)),
+            Expanded(flex: 9, child: _TodayPanel(today: widget.today)),
           ],
         );
       },
@@ -1070,6 +1157,7 @@ class _AgendaDay extends StatelessWidget {
     required this.day,
     required this.events,
     required this.isToday,
+    required this.showTopRule,
     required this.onEventTap,
     required this.onCreate,
   });
@@ -1077,6 +1165,10 @@ class _AgendaDay extends StatelessWidget {
   final DateTime day;
   final List<CalendarEvent> events;
   final bool isToday;
+
+  /// The overview is one continuous page, so the day boundary is drawn as a
+  /// rule on top of the event area. The first day has nothing above it.
+  final bool showTopRule;
   final _OpenEventCallback onEventTap;
   final ValueChanged<DateTime> onCreate;
 
@@ -1087,100 +1179,81 @@ class _AgendaDay extends StatelessWidget {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () => onCreate(day),
-      child: Container(
-        constraints: const BoxConstraints(minHeight: 82),
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        decoration: BoxDecoration(
-          color: isToday
-              ? WeekraColors.daySurfaceToday
-              : WeekraColors.daySurface,
-          borderRadius: BorderRadius.circular(10),
-        ),
+      child: IntrinsicHeight(
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            SizedBox(
+            Container(
               key: const Key('overview-day-column'),
               width: WeekraMetrics.dayColumnWidth,
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+              color: isToday
+                  ? WeekraColors.dayStripToday
+                  : WeekraColors.dayStrip,
               child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    _weekdayName(l10n, day.weekday),
-                    maxLines: 2,
+                    _weekdayShortName(l10n, day.weekday),
+                    maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: isToday ? accent : _mutedInk,
                       fontSize: 10,
-                      height: 1.2,
+                      height: 1.15,
                       fontWeight: FontWeight.w700,
-                      letterSpacing: 1.2,
+                      letterSpacing: 1,
                     ),
                   ),
-                  const SizedBox(height: 3),
-                  Container(
-                    constraints: const BoxConstraints(
-                      minWidth: 34,
-                      minHeight: 34,
-                    ),
-                    padding: const EdgeInsets.all(5),
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: isToday
-                          ? accent.withValues(alpha: 0.14)
-                          : Colors.transparent,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Text(
-                      '${day.day}',
-                      maxLines: 1,
-                      overflow: TextOverflow.visible,
-                      style: TextStyle(
-                        color: isToday ? accent : _ink,
-                        fontSize: 21,
-                        height: 1.1,
-                        fontWeight: FontWeight.w500,
-                      ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${day.day}',
+                    maxLines: 1,
+                    overflow: TextOverflow.visible,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: isToday ? accent : _ink,
+                      fontSize: 20,
+                      height: 1.15,
+                      fontWeight: isToday ? FontWeight.w700 : FontWeight.w500,
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(width: 12),
             Expanded(
-              child: events.isEmpty
-                  ? Padding(
-                      padding: const EdgeInsets.only(top: 18),
-                      child: Text(
-                        l10n.openDay,
-                        softWrap: true,
-                        overflow: TextOverflow.visible,
-                        style: const TextStyle(
-                          color: _mutedInk,
-                          fontSize: 13,
-                          height: 1.3,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  border: showTopRule
+                      ? const Border(top: BorderSide(color: _line))
+                      : null,
+                ),
+                child: Padding(
+                  padding: const EdgeInsetsDirectional.fromSTEB(16, 12, 18, 12),
+                  child: events.isEmpty
+                      ? const SizedBox(height: 44)
+                      : Column(
+                          children: [
+                            for (
+                              var index = 0;
+                              index < events.length;
+                              index++
+                            ) ...[
+                              _AgendaEvent(
+                                event: events[index],
+                                onTap: onEventTap,
+                              ),
+                              if (index != events.length - 1)
+                                _AgendaGap(
+                                  gapStartMinutes: events[index].endMinutes,
+                                  gapEndMinutes: events[index + 1].startMinutes,
+                                ),
+                            ],
+                          ],
                         ),
-                      ),
-                    )
-                  : Column(
-                      children: [
-                        for (
-                          var index = 0;
-                          index < events.length;
-                          index++
-                        ) ...[
-                          _AgendaEvent(
-                            event: events[index],
-                            onTap: onEventTap,
-                          ),
-                          if (index != events.length - 1)
-                            _AgendaGap(
-                              gapStartMinutes: events[index].endMinutes,
-                              gapEndMinutes: events[index + 1].startMinutes,
-                            ),
-                        ],
-                      ],
-                    ),
+                ),
+              ),
             ),
           ],
         ),
@@ -5425,19 +5498,6 @@ String _weekLabel(MaterialLocalizations localizations, DateTime weekStart) {
   }
   return '${localizations.formatMonthYear(weekStart)} / '
       '${localizations.formatMonthYear(weekEnd)}';
-}
-
-String _weekdayName(AppLocalizations l10n, int weekday) {
-  return switch (weekday) {
-    DateTime.monday => l10n.weekdayMonday,
-    DateTime.tuesday => l10n.weekdayTuesday,
-    DateTime.wednesday => l10n.weekdayWednesday,
-    DateTime.thursday => l10n.weekdayThursday,
-    DateTime.friday => l10n.weekdayFriday,
-    DateTime.saturday => l10n.weekdaySaturday,
-    DateTime.sunday => l10n.weekdaySunday,
-    _ => throw ArgumentError.value(weekday, 'weekday'),
-  };
 }
 
 String _weekdayShortName(AppLocalizations l10n, int weekday) {

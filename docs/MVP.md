@@ -2,18 +2,21 @@
 
 ## Product promise
 
-Open the app and understand the entire week at a glance, then change an event
-with minimal interaction.
+Open the app and understand the schedule around today at a glance, then change
+an event with minimal interaction.
 
 ## Included in v0.1
 
-1. A seven-day week view with switchable Grid summary and Hourly layouts.
-2. Current-time indicator and clear emphasis on today.
-3. Previous/next week navigation and a return-to-today action.
-4. Event creation, editing, movement, resizing, and deletion.
-5. Title, start time, end time, color, and optional notes for each event.
-6. Local persistence so the MVP works without an account or network.
-7. Light and dark themes.
+1. An Overview agenda that runs as a continuous day stream, plus a seven-column
+   Hourly week layout; the toolbar switches between them.
+2. The Overview opens on today and keeps extending past either end as the reader
+   scrolls, so it is not limited to a single week.
+3. Current-time indicator and clear emphasis on today.
+4. Previous/next navigation and a return-to-today action.
+5. Event creation, editing, movement, resizing, and deletion.
+6. Title, start time, end time, color, and optional notes for each event.
+7. Local persistence so the MVP works without an account or network.
+8. Light and dark themes.
 
 ## Deliberately excluded
 
@@ -34,10 +37,10 @@ illustrations, written copy, or other protected brand assets.
 ## Success criteria
 
 - A new event can be created in under 10 seconds.
-- The user can identify free time in the current week without opening an event.
+- The user can identify free time without opening an event.
 - The complete 00:00–24:00 range remains visible without vertical scrolling;
   selecting a local time range temporarily magnifies it for precise editing.
-- Week navigation and event manipulation remain smooth on the target devices.
+- Navigation and event manipulation remain smooth on the target devices.
 - Core calendar behavior works fully offline.
 
 ## Desktop week controls

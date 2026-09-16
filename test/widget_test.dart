@@ -895,6 +895,53 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('the overview streams past a single week', (tester) async {
+    _useViewport(tester, const Size(1280, 800));
+    _useDesktopPlatform();
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final beyondWeek = today.add(const Duration(days: 20));
+    await tester.pumpWidget(
+      WeekraApp(
+        eventStore: _MemoryEventStore([
+          _eventOnToday('Stream fixture'),
+          CalendarEvent(
+            id: 'beyond-the-week',
+            title: 'Beyond the week',
+            start: beyondWeek.add(const Duration(hours: 9)),
+            end: beyondWeek.add(const Duration(hours: 10)),
+            color: const Color(0xFF6E8CA8),
+          ),
+        ]),
+        locale: const Locale('en'),
+        enableAutomaticUpdates: false,
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('week-layout-grid')));
+    await tester.pumpAndSettle();
+
+    // Today anchors the stream, so it is on screen without scrolling.
+    expect(find.text('Stream fixture').hitTestable(), findsOneWidget);
+    // A day three weeks out lies past a single week and is not visible yet.
+    expect(find.text('Beyond the week').hitTestable(), findsNothing);
+
+    await tester.scrollUntilVisible(
+      find.text('Beyond the week'),
+      200,
+      scrollable: find.descendant(
+        of: find.byKey(const Key('week-grid-layout')),
+        matching: find.byType(Scrollable),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // The stream keeps going across the week boundary.
+    expect(find.text('Beyond the week').hitTestable(), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    _restoreTestPlatform();
+  });
+
   testWidgets('creates and saves an event', (tester) async {
     final store = _MemoryEventStore();
     await tester.pumpWidget(
@@ -1460,7 +1507,8 @@ void main() {
 
     expect(find.text('W E E K R A'), findsOneWidget);
     expect(find.text('今天'), findsOneWidget);
-    expect(find.text('暂无安排'), findsWidgets);
+    // The overview no longer prints a placeholder for empty days.
+    expect(find.text('暂无安排'), findsNothing);
 
     await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
     await tester.sendKeyEvent(LogicalKeyboardKey.keyN);
@@ -1479,7 +1527,7 @@ void main() {
   ) async {
     _useViewport(tester, const Size(320, 568));
     final store = _MemoryEventStore([
-      _eventAtStartOfWeek(
+      _eventOnToday(
         'A deliberately long calendar event title for layout verification',
       ),
     ]);
@@ -1602,6 +1650,20 @@ CalendarEvent _eventAtStartOfWeek(String title) {
     title: title,
     start: start.add(const Duration(hours: 9)),
     end: start.add(const Duration(hours: 10)),
+    color: const Color(0xFFFF7B6F),
+  );
+}
+
+/// The overview is a continuous stream anchored on today, so fixtures that must
+/// be visible without scrolling belong on today rather than earlier in the week.
+CalendarEvent _eventOnToday(String title) {
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  return CalendarEvent(
+    id: title,
+    title: title,
+    start: today.add(const Duration(hours: 9)),
+    end: today.add(const Duration(hours: 10)),
     color: const Color(0xFFFF7B6F),
   );
 }

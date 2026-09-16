@@ -17,13 +17,17 @@ abstract final class WeekraColors {
   static const dividerSubtle = Color(0x0AFFFFFF);
   static const outline = Color(0x26FFFFFF);
 
-  /// Overview day rows sit slightly above the page canvas so each day reads as
-  /// its own surface. Today is lifted one further step.
-  static const daySurface = Color(0xFF16181B);
-  static const daySurfaceToday = Color(0xFF1F2226);
+  /// The overview runs on one continuous surface instead of one block per day,
+  /// so the event area and the day strip read as two separate columns.
+  static const overviewSurface = Color(0xFF16181B);
 
-  /// Unbooked stretches between two events of the same day sink below
-  /// [daySurface] so free time stays visible at a glance.
+  /// The day strip sits deeper than the event area, the way a dark margin sits
+  /// beside a lighter page. Today lifts above the other days.
+  static const dayStrip = Color(0xFF0B0C0E);
+  static const dayStripToday = Color(0xFF171A1F);
+
+  /// Unbooked stretches between two events sink below [overviewSurface] so free
+  /// time stays visible at a glance.
   static const dayGap = Color(0xFF0B0C0E);
 }
 
