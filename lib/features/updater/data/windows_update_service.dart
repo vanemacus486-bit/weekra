@@ -185,10 +185,7 @@ class WindowsUpdateService implements UpdateService {
   ) async {
     final executable = File(Platform.resolvedExecutable);
     final installDirectory = executable.parent.path;
-    final supportDirectory = await getApplicationSupportDirectory();
-    await supportDirectory.create(recursive: true);
-    final logPath =
-        '${supportDirectory.path}${Platform.pathSeparator}update.log';
+    final logPath = (await _diagnosticFile()).path;
     final script = File('${workDirectory.path}\\install-update.ps1');
     final scriptContents = buildWindowsInstallerScript(
       installerPath: installer.path,
@@ -221,11 +218,7 @@ class WindowsUpdateService implements UpdateService {
     StackTrace stackTrace,
   ) async {
     try {
-      final directory = await getApplicationSupportDirectory();
-      await directory.create(recursive: true);
-      final file = File(
-        '${directory.path}${Platform.pathSeparator}update.log',
-      );
+      final file = await _diagnosticFile();
       await file.writeAsString(
         '[${DateTime.now().toUtc().toIso8601String()}] $phase failed\n'
         '$error\n$stackTrace\n',
@@ -235,6 +228,15 @@ class WindowsUpdateService implements UpdateService {
     } on Object {
       // Diagnostics must never replace the original update failure.
     }
+  }
+
+  Future<File> _diagnosticFile() async {
+    final localAppData = Platform.environment['LOCALAPPDATA'];
+    final directory = localAppData != null && localAppData.isNotEmpty
+        ? Directory('$localAppData\\Weekra\\Logs')
+        : await getApplicationSupportDirectory();
+    await directory.create(recursive: true);
+    return File('${directory.path}${Platform.pathSeparator}update.log');
   }
 
   void _requireHttps(Uri uri) {

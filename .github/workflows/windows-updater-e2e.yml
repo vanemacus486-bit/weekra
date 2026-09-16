@@ -51,8 +51,10 @@ jobs:
             throw 'The updater client did not hand off to the installer.'
           }
           if ($client.ExitCode -ne 0) {
+            Get-Content "$env:RUNNER_TEMP/weekra-update-smoke.log" -ErrorAction SilentlyContinue
             throw "The updater client exited with code $($client.ExitCode)."
           }
+          Get-Content "$env:RUNNER_TEMP/weekra-update-smoke.log" -ErrorAction SilentlyContinue
 
           $changed = $false
           for ($attempt = 0; $attempt -lt 120; $attempt++) {
@@ -68,7 +70,7 @@ jobs:
             }
           }
           if (-not $changed) {
-            Get-ChildItem "$env:APPDATA" -Filter update.log -Recurse -ErrorAction SilentlyContinue |
+            Get-ChildItem "$env:LOCALAPPDATA/Weekra/Logs" -Filter update.log -Recurse -ErrorAction SilentlyContinue |
               ForEach-Object { Get-Content $_.FullName }
             throw 'The installed Weekra executable was never replaced.'
           }
@@ -87,7 +89,7 @@ jobs:
             throw 'Weekra was updated but did not restart.'
           }
 
-          $logs = Get-ChildItem "$env:APPDATA" -Filter update.log -Recurse -ErrorAction SilentlyContinue
+          $logs = Get-ChildItem "$env:LOCALAPPDATA/Weekra/Logs" -Filter update.log -Recurse -ErrorAction SilentlyContinue
           if (-not $logs) { throw 'The updater did not write its persistent log.' }
           $success = $logs | Where-Object {
             (Get-Content $_.FullName -Raw) -match 'Update installed successfully'
@@ -102,6 +104,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: weekra-update-log
-          path: ~/AppData/Roaming/**/update.log
+          path: |
+            ${{ runner.temp }}/weekra-update-smoke.log
+            ~/AppData/Local/Weekra/Logs/update.log
           if-no-files-found: warn
           retention-days: 14

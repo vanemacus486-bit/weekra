@@ -38,7 +38,8 @@ Weekra checks for updates shortly after launch, every six hours, and when
 resumed. Settings shows the installed version and provides a manual check with
 visible connection errors. On Windows the updater honors the same per-user
 system proxy used by browsers and desktop proxy clients, retries interrupted
-requests, and records persistent diagnostics. When a newer version is
+requests, and records persistent diagnostics in
+`%LOCALAPPDATA%\Weekra\Logs\update.log`. When a newer version is
 available, it downloads the installer, verifies its SHA-256 digest, installs
 it, and restarts automatically after the user confirms. Calendar data stays in
 the user's documents directory during updates.

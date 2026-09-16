@@ -54,8 +54,8 @@ browsers and desktop proxy clients use, while preserving environment-proxy and
 direct fallbacks. Manifest and installer requests retry transient connection
 failures. Downloads time out if the connection stops transmitting and still
 require the release SHA-256 digest before installation. Check, download, and
-installer results are appended to a persistent `update.log` in the application
-support directory.
+installer results are appended to
+`%LOCALAPPDATA%\Weekra\Logs\update.log` without relying on a Flutter plugin.
 
 The detached PowerShell installer receives Weekra's process ID explicitly and
 waits for that process before replacing files. Do not use PowerShell's `$PID`
