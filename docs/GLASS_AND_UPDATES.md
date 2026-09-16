@@ -24,6 +24,12 @@ compact card near the selected time on desktop and a centered card otherwise.
 Click/drag empty hourly space, tap a date row in Overview, or use Ctrl/Cmd+N.
 There is no permanent floating add button.
 
+Interactive controls expose their state before an action occurs: pointer hover
+adds a rounded surface and stronger foreground, while press adds a darker state
+and a short compression/release. Ripple splashes are intentionally disabled so
+the response stays anchored to the control. Press motion becomes instantaneous
+when the operating system requests reduced animation.
+
 ## Update delivery
 
 The runtime fallback version must match pubspec.yaml (enforced by a test).

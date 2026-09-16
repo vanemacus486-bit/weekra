@@ -78,7 +78,7 @@ class _SettingsPanelState extends State<SettingsPanel> {
                         style: Theme.of(context).textTheme.headlineSmall,
                       ),
                     ),
-                    IconButton(
+                    WeekraIconButton(
                       key: const Key('close-settings'),
                       tooltip: l10n.closeTooltip,
                       onPressed: widget.onClose,
@@ -171,7 +171,7 @@ class _SettingsPanelState extends State<SettingsPanel> {
                   style: Theme.of(context).textTheme.headlineSmall,
                 ),
               ),
-              IconButton(
+              WeekraIconButton(
                 key: const Key('close-settings'),
                 tooltip: l10n.closeTooltip,
                 onPressed: widget.onClose,
@@ -639,7 +639,7 @@ class _CategoryEditorDialogState extends State<_CategoryEditorDialog> {
                       style: Theme.of(context).textTheme.headlineSmall,
                     ),
                   ),
-                  IconButton(
+                  WeekraIconButton(
                     tooltip: l10n.closeTooltip,
                     onPressed: () => Navigator.pop(context),
                     icon: const Icon(Icons.close_rounded),
