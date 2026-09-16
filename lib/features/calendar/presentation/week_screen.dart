@@ -11,6 +11,7 @@ import 'package:weekra/features/calendar/data/calendar_event_store.dart';
 import 'package:weekra/features/calendar/domain/calendar_event.dart';
 import 'package:weekra/features/calendar/domain/event_category.dart';
 import 'package:weekra/features/calendar/domain/event_category_suggestion.dart';
+import 'package:weekra/features/settings/domain/app_settings.dart';
 import 'package:weekra/l10n/app_localizations.dart';
 
 const _ink = WeekraColors.textPrimary;
@@ -49,12 +50,16 @@ class WeekScreen extends StatefulWidget {
   const WeekScreen({
     super.key,
     required this.eventStore,
+    required this.calendarSettings,
+    required this.categorySettings,
     this.theme = WeekraTheme.ember,
     this.onOpenSettings,
     this.clock,
   });
 
   final CalendarEventStore eventStore;
+  final CalendarViewSettings calendarSettings;
+  final CategorySettings categorySettings;
   final WeekraTheme theme;
   final VoidCallback? onOpenSettings;
   final DateTime Function()? clock;
@@ -76,7 +81,24 @@ class _WeekScreenState extends State<WeekScreen> {
   @override
   void initState() {
     super.initState();
-    _weekStart = _centeredTimelineStart(_now());
+    _weekStart = _timelineStart(_now(), widget.calendarSettings);
+  }
+
+  @override
+  void didUpdateWidget(covariant WeekScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!_sameCalendarSettings(
+      oldWidget.calendarSettings,
+      widget.calendarSettings,
+    )) {
+      final target = _timelineStart(_now(), widget.calendarSettings);
+      _navigationDirection = target.isAfter(_weekStart)
+          ? 1
+          : target.isBefore(_weekStart)
+          ? -1
+          : 0;
+      _weekStart = target;
+    }
   }
 
   @override
@@ -129,6 +151,7 @@ class _WeekScreenState extends State<WeekScreen> {
       initialEnd: initialEnd,
       anchorRect: anchorRect,
       suggestionEvents: _events,
+      categorySettings: widget.categorySettings,
       onSave: (event) async {
         final updatedEvents = [..._events, event]
           ..sort((a, b) => a.start.compareTo(b.start));
@@ -179,6 +202,7 @@ class _WeekScreenState extends State<WeekScreen> {
       existingEvent: event,
       anchorRect: anchorRect,
       suggestionEvents: _events,
+      categorySettings: widget.categorySettings,
       onSave: (updatedEvent) async {
         final updatedEvents =
             _events
@@ -224,8 +248,7 @@ class _WeekScreenState extends State<WeekScreen> {
   }
 
   Future<void> _setEventCategory(CalendarEvent event, String categoryId) async {
-    final category =
-        EventCategories.byId(categoryId) ?? EventCategories.uncategorized;
+    final category = _resolvedCategory(widget.categorySettings, categoryId);
     final updatedEvent = CalendarEvent(
       id: event.id,
       title: event.title,
@@ -247,6 +270,7 @@ class _WeekScreenState extends State<WeekScreen> {
       context,
       event,
       position: position,
+      categorySettings: widget.categorySettings,
     );
     if (selection == null || !mounted) {
       return;
@@ -296,14 +320,18 @@ class _WeekScreenState extends State<WeekScreen> {
     if (offset == 0) {
       return;
     }
+    final dayOffset =
+        widget.calendarSettings.anchorMode == CalendarAnchorMode.weekStart
+        ? offset * DateTime.daysPerWeek
+        : offset;
     setState(() {
-      _navigationDirection = offset.sign;
-      _weekStart = _weekStart.add(Duration(days: offset));
+      _navigationDirection = dayOffset.sign;
+      _weekStart = _weekStart.add(Duration(days: dayOffset));
     });
   }
 
   void _returnToToday() {
-    final target = _centeredTimelineStart(_now());
+    final target = _timelineStart(_now(), widget.calendarSettings);
     if (_isSameDay(target, _weekStart)) {
       return;
     }
@@ -328,10 +356,16 @@ class _WeekScreenState extends State<WeekScreen> {
       7,
       (index) => _weekStart.add(Duration(days: index)),
     );
-    final events = _events.where((event) {
-      final visibleEnd = _weekStart.add(const Duration(days: 7));
-      return event.end.isAfter(_weekStart) && event.start.isBefore(visibleEnd);
-    }).toList();
+    final events = _events
+        .where((event) {
+          final visibleEnd = _weekStart.add(const Duration(days: 7));
+          return event.end.isAfter(_weekStart) &&
+              event.start.isBefore(visibleEnd);
+        })
+        .map(
+          (event) => _eventWithResolvedCategory(event, widget.categorySettings),
+        )
+        .toList();
 
     return CallbackShortcuts(
       bindings: {
@@ -3632,6 +3666,7 @@ class _EventEditorSheet extends StatefulWidget {
   const _EventEditorSheet({
     required this.weekStart,
     required this.suggestionEvents,
+    required this.categorySettings,
     required this.onSave,
     this.existingEvent,
     this.initialStart,
@@ -3644,6 +3679,7 @@ class _EventEditorSheet extends StatefulWidget {
 
   final DateTime weekStart;
   final List<CalendarEvent> suggestionEvents;
+  final CategorySettings categorySettings;
   final _SaveEventCallback onSave;
   final CalendarEvent? existingEvent;
   final DateTime? initialStart;
@@ -3813,9 +3849,10 @@ class _EventEditorSheetState extends State<_EventEditorSheet> {
     }
 
     final location = _locationController.text.trim();
-    final category =
-        EventCategories.byId(_selectedCategoryId) ??
-        EventCategories.uncategorized;
+    final category = _resolvedCategory(
+      widget.categorySettings,
+      _selectedCategoryId,
+    );
     final displayColor =
         category.id == EventCategories.uncategorizedId &&
             !_categoryChangedByUser
@@ -3874,10 +3911,15 @@ class _EventEditorSheetState extends State<_EventEditorSheet> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final materialL10n = MaterialLocalizations.of(context);
-    final category =
-        EventCategories.byId(_selectedCategoryId) ??
-        EventCategories.uncategorized;
-    final categoryName = _categoryName(l10n, category.id);
+    final category = _resolvedCategory(
+      widget.categorySettings,
+      _selectedCategoryId,
+    );
+    final categoryName = _categoryName(
+      l10n,
+      widget.categorySettings,
+      category.id,
+    );
     final visibleCategoryName = _suggestedCategoryId == category.id
         ? l10n.suggestedCategory(categoryName)
         : categoryName;
@@ -3992,9 +4034,20 @@ class _EventEditorSheetState extends State<_EventEditorSheet> {
                     color: WeekraColors.surfaceRaised,
                     position: PopupMenuPosition.under,
                     itemBuilder: (context) => [
-                      _categoryMenuItem(l10n, EventCategories.uncategorized),
+                      _categoryMenuItem(
+                        l10n,
+                        widget.categorySettings,
+                        _resolvedCategory(
+                          widget.categorySettings,
+                          EventCategories.uncategorizedId,
+                        ),
+                      ),
                       for (final option in EventCategories.values)
-                        _categoryMenuItem(l10n, option),
+                        _categoryMenuItem(
+                          l10n,
+                          widget.categorySettings,
+                          _resolvedCategory(widget.categorySettings, option.id),
+                        ),
                     ],
                     child: _CategoryTag(
                       color: category.color,
@@ -4293,6 +4346,7 @@ class _CategoryTag extends StatelessWidget {
 
 PopupMenuItem<String> _categoryMenuItem(
   AppLocalizations l10n,
+  CategorySettings categorySettings,
   EventCategory category,
 ) {
   return PopupMenuItem<String>(
@@ -4309,7 +4363,7 @@ PopupMenuItem<String> _categoryMenuItem(
           ),
         ),
         const SizedBox(width: 10),
-        Text(_categoryName(l10n, category.id)),
+        Text(_categoryName(l10n, categorySettings, category.id)),
       ],
     ),
   );
@@ -4330,6 +4384,7 @@ Future<_EventContextSelection?> _showEventContextMenu(
   BuildContext context,
   CalendarEvent event, {
   required Offset position,
+  required CategorySettings categorySettings,
 }) {
   final l10n = AppLocalizations.of(context);
   final overlay = Overlay.of(context).context.findRenderObject()! as RenderBox;
@@ -4384,7 +4439,7 @@ Future<_EventContextSelection?> _showEventContextMenu(
           const SizedBox(width: 11),
           Expanded(
             child: Text(
-              _categoryName(l10n, category.id),
+              _categoryName(l10n, categorySettings, category.id),
               style: const TextStyle(color: _ink, fontSize: 13),
             ),
           ),
@@ -4444,8 +4499,11 @@ Future<_EventContextSelection?> _showEventContextMenu(
           ),
         ),
       ),
-      categoryItem(EventCategories.uncategorized),
-      for (final category in EventCategories.values) categoryItem(category),
+      categoryItem(
+        _resolvedCategory(categorySettings, EventCategories.uncategorizedId),
+      ),
+      for (final category in EventCategories.values)
+        categoryItem(_resolvedCategory(categorySettings, category.id)),
     ],
   );
 }
@@ -4769,6 +4827,7 @@ Future<CalendarEvent?> _showEventEditorSheet(
   BuildContext context,
   DateTime weekStart, {
   required List<CalendarEvent> suggestionEvents,
+  required CategorySettings categorySettings,
   required _SaveEventCallback onSave,
   CalendarEvent? existingEvent,
   DateTime? initialStart,
@@ -4784,6 +4843,7 @@ Future<CalendarEvent?> _showEventEditorSheet(
       builder: (context) => _EventEditorSheet(
         weekStart: weekStart,
         suggestionEvents: suggestionEvents,
+        categorySettings: categorySettings,
         onSave: onSave,
         existingEvent: existingEvent,
         initialStart: initialStart,
@@ -4799,6 +4859,7 @@ Future<CalendarEvent?> _showEventEditorSheet(
     builder: (context) => _EventEditorSheet(
       weekStart: weekStart,
       suggestionEvents: suggestionEvents,
+      categorySettings: categorySettings,
       onSave: onSave,
       existingEvent: existingEvent,
       initialStart: initialStart,
@@ -4897,8 +4958,12 @@ CalendarEvent _copyEvent(
   );
 }
 
-String _categoryName(AppLocalizations l10n, String categoryId) {
-  return switch (categoryId) {
+String _categoryName(
+  AppLocalizations l10n,
+  CategorySettings categorySettings,
+  String categoryId,
+) {
+  final fallback = switch (categoryId) {
     'category-1' => l10n.categoryOne,
     'category-2' => l10n.categoryTwo,
     'category-3' => l10n.categoryThree,
@@ -4907,11 +4972,59 @@ String _categoryName(AppLocalizations l10n, String categoryId) {
     'category-6' => l10n.categorySix,
     _ => l10n.uncategorized,
   };
+  return categorySettings.nameFor(categoryId, fallback);
 }
 
-DateTime _centeredTimelineStart(DateTime date) {
+EventCategory _resolvedCategory(
+  CategorySettings categorySettings,
+  String categoryId,
+) {
+  final fallback =
+      EventCategories.byId(categoryId) ?? EventCategories.uncategorized;
+  return EventCategory(
+    id: fallback.id,
+    color: categorySettings.colorFor(fallback.id, fallback.color),
+  );
+}
+
+CalendarEvent _eventWithResolvedCategory(
+  CalendarEvent event,
+  CategorySettings categorySettings,
+) {
+  final category = _resolvedCategory(categorySettings, event.categoryId);
+  final color = category.id == EventCategories.uncategorizedId
+      ? event.color
+      : category.color;
+  if (color.toARGB32() == event.color.toARGB32()) {
+    return event;
+  }
+  return CalendarEvent(
+    id: event.id,
+    title: event.title,
+    start: event.start,
+    end: event.end,
+    color: color,
+    categoryId: event.categoryId,
+    location: event.location,
+  );
+}
+
+DateTime _timelineStart(DateTime date, CalendarViewSettings settings) {
   final day = DateTime(date.year, date.month, date.day);
-  return day.subtract(const Duration(days: 3));
+  if (settings.anchorMode == CalendarAnchorMode.today) {
+    return day.subtract(Duration(days: settings.todayColumn));
+  }
+  final daysSinceStart = (day.weekday - settings.weekStartsOn) % 7;
+  return day.subtract(Duration(days: daysSinceStart));
+}
+
+bool _sameCalendarSettings(
+  CalendarViewSettings first,
+  CalendarViewSettings second,
+) {
+  return first.anchorMode == second.anchorMode &&
+      first.todayColumn == second.todayColumn &&
+      first.weekStartsOn == second.weekStartsOn;
 }
 
 int _dateKey(DateTime date) => date.year * 10000 + date.month * 100 + date.day;

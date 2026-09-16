@@ -13,7 +13,7 @@ class CalendarEvent {
   }) : categoryId =
            EventCategories.byId(categoryId)?.id ??
            EventCategories.idForLegacyColor(color),
-       _legacyColor = color,
+       _color = color,
        assert(end.isAfter(start), 'Event end must be after its start.');
 
   final String id;
@@ -21,15 +21,10 @@ class CalendarEvent {
   final DateTime start;
   final DateTime end;
   final String categoryId;
-  final Color _legacyColor;
+  final Color _color;
   final String? location;
 
-  Color get color => EventCategories.colorFor(
-    categoryId,
-    legacyColor: categoryId == EventCategories.uncategorizedId
-        ? _legacyColor
-        : null,
-  );
+  Color get color => _color;
 
   int get startMinutes => start.hour * 60 + start.minute;
 

@@ -58,4 +58,29 @@ void main() {
     expect(loaded!.single.categoryId, 'category-2');
     expect(loaded.single.color, const Color(0xFF70B8AF));
   });
+
+  test('preserves a customized color for a stable category id', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'weekra_category_color_',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final store = JsonCalendarEventStore(
+      directoryProvider: () async => directory,
+    );
+    final event = CalendarEvent(
+      id: 'custom-color',
+      title: 'Study',
+      start: DateTime(2026, 9, 3, 15),
+      end: DateTime(2026, 9, 3, 16),
+      categoryId: 'category-2',
+      color: const Color(0xFF5BB7D2),
+    );
+
+    await store.save([event]);
+    final loaded = await store.load();
+
+    expect(loaded, hasLength(1));
+    expect(loaded!.single.categoryId, 'category-2');
+    expect(loaded.single.color, const Color(0xFF5BB7D2));
+  });
 }

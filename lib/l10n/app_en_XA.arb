@@ -86,6 +86,29 @@
   "seedEveningWalk": "⟦Relaxing walk during the evening⟧",
   "settingsTooltip": "⟦Settings control⟧",
   "settingsTitle": "⟦Application settings page⟧",
+  "settingsCalendar": "⟦Calendar arrangement controls⟧",
+  "settingsCalendarDescription": "⟦Choose precisely how the complete seven-day timeline is anchored.⟧",
+  "settingsCategories": "⟦Calendar event categories⟧",
+  "settingsCategoriesDescription": "⟦Rename every category and choose its distinctive display color.⟧",
+  "settingsCalendarArrangement": "⟦Seven-day calendar arrangement⟧",
+  "settingsCalendarArrangementDescription": "⟦Keep today in one chosen column, or align every calendar view to one fixed weekday.⟧",
+  "settingsAnchorToday": "⟦Position today in the timeline⟧",
+  "settingsAnchorWeekStart": "⟦Use a fixed weekly starting day⟧",
+  "settingsTodayPosition": "⟦Today’s chosen column position⟧",
+  "settingsTodayPositionDescription": "⟦Choose exactly which of all seven columns contains today.⟧",
+  "settingsColumnNumber": "⟦Column number {column}⟧",
+  "@settingsColumnNumber": {
+    "placeholders": {
+      "column": {
+        "type": "int"
+      }
+    }
+  },
+  "settingsWeekStartsOn": "⟦Every calendar week starts on⟧",
+  "settingsWeekStartsOnDescription": "⟦The complete visible date range always begins on this weekday.⟧",
+  "settingsEditCategory": "⟦Edit this calendar event category⟧",
+  "settingsCategoryName": "⟦Calendar category display name⟧",
+  "settingsCategoryColor": "⟦Calendar category display color⟧",
   "settingsAppearance": "⟦Appearance and visual theme⟧",
   "settingsLanguage": "⟦Application language selection⟧",
   "themeEmber": "⟦Warm ember color theme⟧",
