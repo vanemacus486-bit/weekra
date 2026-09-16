@@ -49,13 +49,24 @@ build commit. Increase both version declarations for every release.
 
 Checks run after launch, every six hours, on resume after ten minutes, and via
 Settings. Failures are visible and retryable; Settings shows the current version
-and latest check status. Downloads time out if the connection stops transmitting
-and still require the release SHA-256 digest before installation.
+and latest check status. The Windows client reads the per-user system proxy that
+browsers and desktop proxy clients use, while preserving environment-proxy and
+direct fallbacks. Manifest and installer requests retry transient connection
+failures. Downloads time out if the connection stops transmitting and still
+require the release SHA-256 digest before installation. Check, download, and
+installer results are appended to
+`%LOCALAPPDATA%\Weekra\Logs\update.log` without relying on a Flutter plugin.
 
-The detached PowerShell installer receives Weekra's process ID explicitly and
-waits for that process before replacing files. Do not use PowerShell's `$PID`
-for this wait: variable names are case-insensitive and `$PID` always identifies
-the PowerShell host itself, which would deadlock the update indefinitely.
+Weekra launches the verified Inno Setup executable directly and waits for its
+own log file before exiting. Inno Setup's Restart Manager closes the old app,
+replaces its files, and the installer's `[Run]` stage launches the new version.
+The updater intentionally does not spawn a hidden PowerShell process: that
+extra handoff was both unnecessary and liable to security-policy blocking.
+
+Updater pull requests run a Windows end-to-end job in addition to unit tests.
+The job launches a deliberately old client, consumes the public release
+manifest, downloads and verifies the installer, waits for process handoff,
+checks that the executable changed, and confirms that Weekra restarted.
 
 A functioning GitHub connection is required for this release channel. This does
 not bypass network restrictions or retrofit an updater into a binary that never

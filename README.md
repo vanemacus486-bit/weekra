@@ -34,10 +34,15 @@ The installer places the production app in the current user's local Programs
 folder, adds Start menu integration, and optionally creates a desktop shortcut.
 Flutter is not required on the user's computer.
 
-Weekra checks for updates shortly after launch, every six hours, and when resumed. Settings shows the installed version and provides a manual check with visible connection errors. When a newer version is
-available, it downloads the portable release, verifies its SHA-256 digest,
-installs it, and restarts automatically after the user confirms. Calendar data
-stays in the user's documents directory during updates.
+Weekra checks for updates shortly after launch, every six hours, and when
+resumed. Settings shows the installed version and provides a manual check with
+visible connection errors. On Windows the updater honors the same per-user
+system proxy used by browsers and desktop proxy clients, retries interrupted
+requests, and records persistent diagnostics in
+`%LOCALAPPDATA%\Weekra\Logs\update.log`. When a newer version is
+available, it downloads the installer, verifies its SHA-256 digest, installs
+it, and restarts automatically after the user confirms. Calendar data stays in
+the user's documents directory during updates.
 
 An unsigned portable build, `weekra-windows-x64.zip`, is also attached to each
 release. Extract the complete folder before opening `weekra.exe`.
@@ -53,6 +58,12 @@ Because the app reads the latest release automatically, no update URL needs to
 be edited for future versions. The repository and its Releases must be public
 unless a separate public update host is configured at build time with
 `WEEKRA_UPDATE_MANIFEST_URL`.
+
+Pull requests that change the updater run a real Windows upgrade smoke test. It
+builds a deliberately old client, downloads the current public release,
+verifies and installs it, then confirms that the executable was replaced and
+Weekra restarted. This test is separate from unit tests that inspect the helper
+script.
 
 ## Current progress
 

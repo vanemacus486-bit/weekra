@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:weekra/app/app_version.dart';
+import 'package:weekra/features/updater/data/windows_proxy.dart';
 import 'package:weekra/features/updater/domain/app_update.dart';
 import 'package:weekra/features/updater/domain/update_service.dart';
 
@@ -18,62 +19,56 @@ const _manifestUrl = String.fromEnvironment(
 );
 
 class WindowsUpdateService implements UpdateService {
-  WindowsUpdateService({HttpClient? httpClient})
-    : _httpClient = httpClient ?? HttpClient();
+  WindowsUpdateService({HttpClient? httpClient}) : _httpClient = httpClient;
 
-  final HttpClient _httpClient;
+  HttpClient? _httpClient;
+  Future<HttpClient>? _configuredClient;
+
+  Future<HttpClient> _client() {
+    final injected = _httpClient;
+    if (injected != null) return Future.value(injected);
+    return _configuredClient ??= _createConfiguredClient();
+  }
+
+  Future<HttpClient> _createConfiguredClient() async {
+    final client = HttpClient()
+      ..connectionTimeout = const Duration(seconds: 30);
+    final systemProxy = await readWindowsProxyDirective();
+    client.findProxy = (uri) {
+      final environmentProxy = HttpClient.findProxyFromEnvironment(uri);
+      if (environmentProxy != 'DIRECT') {
+        return environmentProxy.contains('DIRECT')
+            ? environmentProxy
+            : '$environmentProxy; DIRECT';
+      }
+      return systemProxy ?? 'DIRECT';
+    };
+    _httpClient = client;
+    return client;
+  }
 
   @override
   Future<AppUpdate?> checkForUpdate() async {
     final manifestUri = Uri.parse(_manifestUrl);
     _requireHttps(manifestUri);
-    final request = await _httpClient
-        .getUrl(manifestUri)
-        .timeout(const Duration(seconds: 12));
-    request.headers.set(HttpHeaders.userAgentHeader, 'Weekra/$_currentVersion');
-    final response = await request.close().timeout(const Duration(seconds: 12));
-    if (response.statusCode != HttpStatus.ok) {
-      await response.drain<void>();
-      throw HttpException(
-        'Update manifest returned HTTP ${response.statusCode}.',
-        uri: manifestUri,
-      );
+    try {
+      final response = await _openGet(manifestUri, attempts: 3);
+      if (response.statusCode != HttpStatus.ok) {
+        await response.drain<void>();
+        throw HttpException(
+          'Update manifest returned HTTP ${response.statusCode}.',
+          uri: manifestUri,
+        );
+      }
+      final body = await utf8.decoder
+          .bind(response)
+          .join()
+          .timeout(const Duration(seconds: 45));
+      return parseUpdateManifest(body, currentVersion: _currentVersion);
+    } on Object catch (error, stackTrace) {
+      await _writeDiagnostic('check', error, stackTrace);
+      rethrow;
     }
-    final body = await utf8.decoder
-        .bind(response)
-        .join()
-        .timeout(const Duration(seconds: 20));
-    final manifest = jsonDecode(body);
-    if (manifest is! Map<String, dynamic>) {
-      throw const FormatException('Update manifest must be an object.');
-    }
-
-    final version = manifest['version'];
-    final windows = manifest['windows'];
-    if (version is! String || windows is! Map<String, dynamic>) {
-      throw const FormatException('Update manifest is missing Windows data.');
-    }
-    if (!isNewerVersion(version, _currentVersion)) {
-      return null;
-    }
-
-    // New clients use the verified installer while 0.5.4 and earlier keep
-    // consuming the portable archive fields from the same manifest.
-    final url = windows['installerUrl'] ?? windows['url'];
-    final expectedHash =
-        windows['installerSha256'] ?? windows['sha256'];
-    if (url is! String ||
-        expectedHash is! String ||
-        !RegExp(r'^[a-fA-F0-9]{64}$').hasMatch(expectedHash)) {
-      throw const FormatException('Update download metadata is invalid.');
-    }
-    final downloadUri = Uri.parse(url);
-    _requireHttps(downloadUri);
-    return AppUpdate(
-      version: version,
-      downloadUri: downloadUri,
-      sha256: expectedHash.toLowerCase(),
-    );
   }
 
   @override
@@ -95,7 +90,7 @@ class WindowsUpdateService implements UpdateService {
     );
 
     try {
-      await _download(update.downloadUri, installer, onProgress);
+      await _download(update.downloadUri, installer, onProgress, attempts: 3);
       final actualHash = await sha256.bind(installer.openRead()).first;
       if (actualHash.toString() != update.sha256) {
         throw const FormatException(
@@ -103,8 +98,9 @@ class WindowsUpdateService implements UpdateService {
         );
       }
       onProgress?.call(1);
-      await _launchInstallerScript(workDirectory, installer);
-    } on Object {
+      await _launchInstaller(installer);
+    } on Object catch (error, stackTrace) {
+      await _writeDiagnostic('download', error, stackTrace);
       if (await workDirectory.exists()) {
         await workDirectory.delete(recursive: true);
       }
@@ -115,68 +111,132 @@ class WindowsUpdateService implements UpdateService {
   Future<void> _download(
     Uri uri,
     File destination,
-    UpdateProgressCallback? onProgress,
-  ) async {
-    final request = await _httpClient
-        .getUrl(uri)
-        .timeout(const Duration(seconds: 15));
-    request.headers.set(HttpHeaders.userAgentHeader, 'Weekra/$_currentVersion');
-    final response = await request.close().timeout(const Duration(seconds: 15));
-    if (response.statusCode != HttpStatus.ok) {
-      await response.drain<void>();
-      throw HttpException(
-        'Update download returned HTTP ${response.statusCode}.',
-        uri: uri,
+    UpdateProgressCallback? onProgress, {
+    int attempts = 1,
+  }) async {
+    Object? lastError;
+    StackTrace? lastStackTrace;
+    for (var attempt = 1; attempt <= attempts; attempt++) {
+      try {
+        final response = await _openGet(uri);
+        if (response.statusCode != HttpStatus.ok) {
+          await response.drain<void>();
+          throw HttpException(
+            'Update download returned HTTP ${response.statusCode}.',
+            uri: uri,
+          );
+        }
+
+        final sink = destination.openWrite();
+        var received = 0;
+        final total = response.contentLength;
+        try {
+          await for (final chunk in response.timeout(
+            const Duration(seconds: 45),
+          )) {
+            sink.add(chunk);
+            received += chunk.length;
+            onProgress?.call(total > 0 ? received / total : null);
+          }
+        } finally {
+          await sink.close();
+        }
+        return;
+      } on Object catch (error, stackTrace) {
+        lastError = error;
+        lastStackTrace = stackTrace;
+        if (attempt < attempts) {
+          onProgress?.call(null);
+          await Future<void>.delayed(Duration(milliseconds: 400 * attempt));
+        }
+      }
+    }
+    Error.throwWithStackTrace(lastError!, lastStackTrace!);
+  }
+
+  Future<HttpClientResponse> _openGet(Uri uri, {int attempts = 1}) async {
+    Object? lastError;
+    StackTrace? lastStackTrace;
+    for (var attempt = 1; attempt <= attempts; attempt++) {
+      try {
+        final client = await _client();
+        final request = await client
+            .getUrl(uri)
+            .timeout(const Duration(seconds: 30));
+        request.headers.set(
+          HttpHeaders.userAgentHeader,
+          'Weekra/$_currentVersion',
+        );
+        return await request.close().timeout(const Duration(seconds: 30));
+      } on Object catch (error, stackTrace) {
+        lastError = error;
+        lastStackTrace = stackTrace;
+        if (attempt < attempts) {
+          await Future<void>.delayed(Duration(milliseconds: 400 * attempt));
+        }
+      }
+    }
+    Error.throwWithStackTrace(lastError!, lastStackTrace!);
+  }
+
+  Future<void> _launchInstaller(File installer) async {
+    final executable = File(Platform.resolvedExecutable);
+    final installDirectory = executable.parent.path;
+    final logPath = (await _diagnosticFile()).path;
+    final installerLog = File('$logPath.installer');
+    if (await installerLog.exists()) await installerLog.delete();
+    final arguments = windowsInstallerArguments(
+      installDirectory: installDirectory,
+      installerLogPath: installerLog.path,
+    );
+    final setup = await Process.start(
+      installer.path,
+      arguments,
+      mode: ProcessStartMode.detached,
+    );
+    for (
+      var attempt = 0;
+      attempt < 300 && !await installerLog.exists();
+      attempt++
+    ) {
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    }
+    if (!await installerLog.exists()) {
+      setup.kill();
+      throw ProcessException(
+        installer.path,
+        arguments,
+        'The verified installer did not acknowledge the handoff.',
       );
     }
+    exit(0);
+  }
 
-    final sink = destination.openWrite();
-    var received = 0;
-    final total = response.contentLength;
+  Future<void> _writeDiagnostic(
+    String phase,
+    Object error,
+    StackTrace stackTrace,
+  ) async {
     try {
-      await for (final chunk in response.timeout(const Duration(seconds: 30))) {
-        sink.add(chunk);
-        received += chunk.length;
-        onProgress?.call(total > 0 ? received / total : null);
-      }
-    } finally {
-      await sink.close();
+      final file = await _diagnosticFile();
+      await file.writeAsString(
+        '[${DateTime.now().toUtc().toIso8601String()}] $phase failed\n'
+        '$error\n$stackTrace\n',
+        mode: FileMode.append,
+        flush: true,
+      );
+    } on Object {
+      // Diagnostics must never replace the original update failure.
     }
   }
 
-  Future<void> _launchInstallerScript(
-    Directory workDirectory,
-    File installer,
-  ) async {
-    final executable = File(Platform.resolvedExecutable);
-    final installDirectory = executable.parent.path;
-    final logPath = '${workDirectory.path}\\update.log';
-    final script = File('${workDirectory.path}\\install-update.ps1');
-    // PowerShell's case-insensitive $PID variable identifies PowerShell itself.
-    // Keep the Weekra process ID separate so the helper can safely outlive it.
-    final scriptContents = buildWindowsInstallerScript(
-      installerPath: installer.path,
-      installDirectory: installDirectory,
-      executablePath: executable.path,
-      logPath: logPath,
-      appProcessId: pid,
-    );
-    await script.writeAsString(scriptContents, flush: true);
-    await Process.start(
-      'powershell.exe',
-      [
-        '-NoProfile',
-        '-NonInteractive',
-        '-ExecutionPolicy',
-        'Bypass',
-        '-WindowStyle',
-        'Hidden',
-        '-File',
-        script.path,
-      ],
-      mode: ProcessStartMode.detached,
-    );
-    exit(0);
+  Future<File> _diagnosticFile() async {
+    final localAppData = Platform.environment['LOCALAPPDATA'];
+    final directory = localAppData != null && localAppData.isNotEmpty
+        ? Directory('$localAppData\\Weekra\\Logs')
+        : await getApplicationSupportDirectory();
+    await directory.create(recursive: true);
+    return File('${directory.path}${Platform.pathSeparator}update.log');
   }
 
   void _requireHttps(Uri uri) {
@@ -186,45 +246,53 @@ class WindowsUpdateService implements UpdateService {
   }
 }
 
-String buildWindowsInstallerScript({
-  required String installerPath,
-  required String installDirectory,
-  required String executablePath,
-  required String logPath,
-  required int appProcessId,
+AppUpdate? parseUpdateManifest(
+  String body, {
+  required String currentVersion,
 }) {
-  String literal(String value) => value.replaceAll("'", "''");
+  final manifest = jsonDecode(body);
+  if (manifest is! Map<String, dynamic>) {
+    throw const FormatException('Update manifest must be an object.');
+  }
 
-  return '''
-\$ErrorActionPreference = 'Stop'
-\$installer = '${literal(installerPath)}'
-\$install = '${literal(installDirectory)}'
-\$executable = '${literal(executablePath)}'
-\$log = '${literal(logPath)}'
-\$appPid = $appProcessId
+  final version = manifest['version'];
+  final windows = manifest['windows'];
+  if (version is! String || windows is! Map<String, dynamic>) {
+    throw const FormatException('Update manifest is missing Windows data.');
+  }
+  if (!isNewerVersion(version, currentVersion)) return null;
 
-try {
-  Wait-Process -Id \$appPid -ErrorAction SilentlyContinue
-  \$arguments = @(
-    '/VERYSILENT'
-    '/SUPPRESSMSGBOXES'
-    '/NORESTART'
-    '/SP-'
-    ('/DIR="' + \$install + '"')
-  )
-  \$process = Start-Process -FilePath \$installer -ArgumentList \$arguments -Wait -PassThru
-  if (\$process.ExitCode -ne 0) {
-    throw "Weekra installer failed with exit code \$(\$process.ExitCode)."
+  // New clients use the verified installer while 0.5.4 and earlier keep
+  // consuming the portable archive fields from the same manifest.
+  final url = windows['installerUrl'] ?? windows['url'];
+  final expectedHash = windows['installerSha256'] ?? windows['sha256'];
+  if (url is! String ||
+      expectedHash is! String ||
+      !RegExp(r'^[a-fA-F0-9]{64}$').hasMatch(expectedHash)) {
+    throw const FormatException('Update download metadata is invalid.');
   }
-  if (-not (Test-Path -LiteralPath \$executable)) {
-    throw 'Weekra executable was not found after installation.'
+  final downloadUri = Uri.parse(url);
+  if (downloadUri.scheme != 'https' || downloadUri.host.isEmpty) {
+    throw const FormatException('Update URLs must use HTTPS.');
   }
-  Start-Process -FilePath \$executable -WorkingDirectory \$install
-} catch {
-  \$_ | Out-File -LiteralPath \$log -Encoding UTF8
-  if (Test-Path -LiteralPath \$executable) {
-    Start-Process -FilePath \$executable -WorkingDirectory \$install
-  }
+  return AppUpdate(
+    version: version,
+    downloadUri: downloadUri,
+    sha256: expectedHash.toLowerCase(),
+  );
 }
-''';
-}
+
+List<String> windowsInstallerArguments({
+  required String installDirectory,
+  required String installerLogPath,
+}) =>
+    <String>[
+      '/VERYSILENT',
+      '/SUPPRESSMSGBOXES',
+      '/NORESTART',
+      '/SP-',
+      '/CLOSEAPPLICATIONS',
+      '/RESTARTAPPLICATIONS',
+      '/DIR=$installDirectory',
+      '/LOG=$installerLogPath',
+    ];

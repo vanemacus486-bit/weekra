@@ -1,0 +1,129 @@
+name: Windows updater end to end
+
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows: ['Windows Release']
+    types: [completed]
+  pull_request:
+    branches: [main]
+    paths:
+      - 'lib/features/updater/**'
+      - 'installer/**'
+      - 'tool/windows_update_smoke.dart'
+      - '.github/workflows/windows-updater-e2e.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  update-installed-copy:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: windows-latest
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Build deliberately old updater client
+        shell: pwsh
+        run: |
+          flutter create . --platforms=windows
+          flutter pub get
+          flutter gen-l10n
+          flutter build windows --release `
+            --target tool/windows_update_smoke.dart `
+            --dart-define=WEEKRA_VERSION=0.0.0
+
+      - name: Run a real update and verify replacement
+        shell: pwsh
+        run: |
+          $executable = Resolve-Path 'build/windows/x64/runner/Release/weekra.exe'
+          $before = (Get-FileHash -Algorithm SHA256 $executable).Hash
+          $client = Start-Process -FilePath $executable -PassThru
+          if (-not $client.WaitForExit(240000)) {
+            Stop-Process -Id $client.Id -Force -ErrorAction SilentlyContinue
+            throw 'The updater client did not hand off to the installer.'
+          }
+          if ($client.ExitCode -ne 0) {
+            Get-Content "$env:RUNNER_TEMP/weekra-update-smoke.log" -ErrorAction SilentlyContinue
+            throw "The updater client exited with code $($client.ExitCode)."
+          }
+          Get-Content "$env:RUNNER_TEMP/weekra-update-smoke.log" -ErrorAction SilentlyContinue
+
+          $changed = $false
+          for ($attempt = 0; $attempt -lt 120; $attempt++) {
+            Start-Sleep -Seconds 1
+            try {
+              $after = (Get-FileHash -Algorithm SHA256 $executable).Hash
+              if ($after -ne $before) {
+                $changed = $true
+                break
+              }
+            } catch {
+              # The installer may hold the executable briefly while replacing it.
+            }
+          }
+          if (-not $changed) {
+            Get-ChildItem "$env:LOCALAPPDATA/Weekra/Logs" -Filter 'update.log*' -Recurse -ErrorAction SilentlyContinue |
+              ForEach-Object { Get-Content $_.FullName }
+            Get-ChildItem "$env:TEMP" -Filter 'weekra-update-*' -Directory -ErrorAction SilentlyContinue |
+              Get-ChildItem -File -ErrorAction SilentlyContinue |
+              ForEach-Object {
+                Write-Host "--- $($_.FullName)"
+                if ($_.Extension -in '.ps1', '.log') { Get-Content $_.FullName }
+              }
+            throw 'The installed Weekra executable was never replaced.'
+          }
+
+          $restarted = $false
+          for ($attempt = 0; $attempt -lt 30; $attempt++) {
+            Start-Sleep -Seconds 1
+            $process = Get-Process weekra -ErrorAction SilentlyContinue
+            if ($process) {
+              $restarted = $true
+              $process | Stop-Process -Force
+              break
+            }
+          }
+          if (-not $restarted) {
+            if ($env:GITHUB_EVENT_NAME -eq 'workflow_run') {
+              throw 'The published Weekra update installed but did not restart.'
+            }
+            Write-Warning 'The legacy public installer does not restart after a silent update; the replacement itself succeeded.'
+          }
+
+          $logs = Get-ChildItem "$env:LOCALAPPDATA/Weekra/Logs" -Filter 'update.log*' -Recurse -ErrorAction SilentlyContinue
+          if (-not $logs) { throw 'The updater did not write its persistent log.' }
+          $success = $logs | Where-Object {
+            (Get-Content $_.FullName -Raw) -match 'Installation process succeeded'
+          }
+          if (-not $success) {
+            $logs | ForEach-Object { Get-Content $_.FullName }
+            throw 'The persistent update log did not record success.'
+          }
+
+      - name: Collect updater logs
+        if: always()
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path updater-logs -Force | Out-Null
+          Copy-Item "$env:RUNNER_TEMP/weekra-update-smoke.log" updater-logs -ErrorAction SilentlyContinue
+          Copy-Item "$env:LOCALAPPDATA/Weekra/Logs/*" updater-logs -ErrorAction SilentlyContinue
+          Get-ChildItem "$env:TEMP" -Filter 'weekra-update-*' -Directory -ErrorAction SilentlyContinue |
+            Get-ChildItem -File -ErrorAction SilentlyContinue |
+            Copy-Item -Destination updater-logs -ErrorAction SilentlyContinue
+
+      - name: Upload updater log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: weekra-update-log
+          path: updater-logs
+          if-no-files-found: warn
+          retention-days: 14
