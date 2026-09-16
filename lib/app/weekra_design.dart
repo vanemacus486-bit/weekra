@@ -16,6 +16,15 @@ abstract final class WeekraColors {
   static const divider = Color(0x14FFFFFF);
   static const dividerSubtle = Color(0x0AFFFFFF);
   static const outline = Color(0x26FFFFFF);
+
+  /// Overview day rows sit slightly above the page canvas so each day reads as
+  /// its own surface. Today is lifted one further step.
+  static const daySurface = Color(0xFF16181B);
+  static const daySurfaceToday = Color(0xFF1F2226);
+
+  /// Unbooked stretches between two events of the same day sink below
+  /// [daySurface] so free time stays visible at a glance.
+  static const dayGap = Color(0xFF0B0C0E);
 }
 
 abstract final class WeekraMetrics {
@@ -23,6 +32,13 @@ abstract final class WeekraMetrics {
   static const controlRadius = 10.0;
   static const eventRadius = 9.0;
   static const pageGutter = 28.0;
+
+  /// Fixed width of the weekday and day-number column in overview rows.
+  static const dayColumnWidth = 64.0;
+
+  /// Narrower than this, the overview drops its side panel and lets the agenda
+  /// use the full width.
+  static const overviewPanelBreakpoint = 900.0;
 }
 
 /// Motion and material values used by the calendar interaction surfaces.

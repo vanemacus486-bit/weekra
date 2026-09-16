@@ -844,6 +844,57 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('keeps a fixed today panel beside a wide overview', (
+    tester,
+  ) async {
+    _useViewport(tester, const Size(1280, 800));
+    _useDesktopPlatform();
+    await tester.pumpWidget(
+      WeekraApp(
+        eventStore: _MemoryEventStore([_eventAtStartOfWeek('Wide overview')]),
+        locale: const Locale('en'),
+        clock: () => DateTime(2026, 9, 16, 10, 32),
+        enableAutomaticUpdates: false,
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('week-layout-grid')));
+    await tester.pumpAndSettle();
+
+    final panel = find.byKey(const Key('overview-today-panel'));
+    expect(panel, findsOneWidget);
+    expect(
+      find.descendant(of: panel, matching: find.textContaining('2026')),
+      findsOneWidget,
+    );
+    expect(
+      tester.getSize(find.byKey(const Key('overview-day-column')).first).width,
+      64,
+    );
+    expect(tester.takeException(), isNull);
+    _restoreTestPlatform();
+  });
+
+  testWidgets('drops the today panel on a narrow overview', (tester) async {
+    _useViewport(tester, const Size(390, 844));
+    await tester.pumpWidget(
+      WeekraApp(
+        eventStore: _MemoryEventStore([_eventAtStartOfWeek('Narrow overview')]),
+        locale: const Locale('en'),
+        clock: () => DateTime(2026, 9, 16, 10, 32),
+        enableAutomaticUpdates: false,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const Key('week-grid-layout')).hitTestable(),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('overview-today-panel')), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('creates and saves an event', (tester) async {
     final store = _MemoryEventStore();
     await tester.pumpWidget(

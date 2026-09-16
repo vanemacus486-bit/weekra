@@ -973,12 +973,11 @@ class _WeekGridSummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListView.separated(
+    final agenda = ListView.separated(
       key: const Key('week-grid-layout'),
       padding: const EdgeInsetsDirectional.fromSTEB(18, 4, 18, 92),
       itemCount: days.length,
-      separatorBuilder: (context, index) =>
-          const Divider(height: 1, color: _line),
+      separatorBuilder: (context, index) => const SizedBox(height: 8),
       itemBuilder: (context, dayIndex) {
         final day = days[dayIndex];
         final dayEvents =
@@ -994,6 +993,74 @@ class _WeekGridSummary extends StatelessWidget {
           onCreate: onCreate,
         );
       },
+    );
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < WeekraMetrics.overviewPanelBreakpoint) {
+          return agenda;
+        }
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(flex: 11, child: agenda),
+            Expanded(flex: 9, child: _TodayPanel(today: today)),
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// Global anchor beside the overview agenda.
+///
+/// It always reports the real current date, so browsing other weeks never
+/// changes what "today" means.
+class _TodayPanel extends StatelessWidget {
+  const _TodayPanel({required this.today});
+
+  final DateTime today;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return DecoratedBox(
+      key: const Key('overview-today-panel'),
+      decoration: const BoxDecoration(
+        border: Border(left: BorderSide(color: _line)),
+      ),
+      child: Padding(
+        padding: const EdgeInsetsDirectional.fromSTEB(24, 22, 24, 22),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Text(
+              l10n.today,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: _tertiaryInk,
+                fontSize: 11,
+                height: 1.2,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 2,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              MaterialLocalizations.of(context).formatFullDate(today),
+              textAlign: TextAlign.center,
+              softWrap: true,
+              style: const TextStyle(
+                color: _ink,
+                fontSize: 19,
+                height: 1.3,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -1025,101 +1092,97 @@ class _AgendaDay extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 14),
         decoration: BoxDecoration(
           color: isToday
-              ? WeekraColors.textPrimary.withValues(alpha: 0.022)
-              : Colors.transparent,
+              ? WeekraColors.daySurfaceToday
+              : WeekraColors.daySurface,
           borderRadius: BorderRadius.circular(10),
         ),
-        child: LayoutBuilder(
-          builder: (context, constraints) => Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Flexible(
-                flex: 2,
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    maxWidth: constraints.maxWidth * 0.28,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              key: const Key('overview-day-column'),
+              width: WeekraMetrics.dayColumnWidth,
+              child: Column(
+                children: [
+                  Text(
+                    _weekdayName(l10n, day.weekday),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: isToday ? accent : _mutedInk,
+                      fontSize: 10,
+                      height: 1.2,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1.2,
+                    ),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _weekdayName(l10n, day.weekday),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: isToday ? accent : _mutedInk,
-                          fontSize: 10,
-                          height: 1.2,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 1.2,
-                        ),
+                  const SizedBox(height: 3),
+                  Container(
+                    constraints: const BoxConstraints(
+                      minWidth: 34,
+                      minHeight: 34,
+                    ),
+                    padding: const EdgeInsets.all(5),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: isToday
+                          ? accent.withValues(alpha: 0.14)
+                          : Colors.transparent,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Text(
+                      '${day.day}',
+                      maxLines: 1,
+                      overflow: TextOverflow.visible,
+                      style: TextStyle(
+                        color: isToday ? accent : _ink,
+                        fontSize: 21,
+                        height: 1.1,
+                        fontWeight: FontWeight.w500,
                       ),
-                      const SizedBox(height: 3),
-                      Container(
-                        constraints: const BoxConstraints(
-                          minWidth: 34,
-                          minHeight: 34,
-                        ),
-                        padding: const EdgeInsets.all(5),
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: isToday
-                              ? accent.withValues(alpha: 0.14)
-                              : Colors.transparent,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Text(
-                          '${day.day}',
-                          maxLines: 1,
-                          overflow: TextOverflow.visible,
-                          style: TextStyle(
-                            color: isToday ? accent : _ink,
-                            fontSize: 21,
-                            height: 1.1,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
-                ),
+                ],
               ),
-              const SizedBox(width: 14),
-              Expanded(
-                flex: 5,
-                child: events.isEmpty
-                    ? Padding(
-                        padding: const EdgeInsets.only(top: 18),
-                        child: Text(
-                          l10n.openDay,
-                          softWrap: true,
-                          overflow: TextOverflow.visible,
-                          style: const TextStyle(
-                            color: _mutedInk,
-                            fontSize: 13,
-                            height: 1.3,
-                          ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: events.isEmpty
+                  ? Padding(
+                      padding: const EdgeInsets.only(top: 18),
+                      child: Text(
+                        l10n.openDay,
+                        softWrap: true,
+                        overflow: TextOverflow.visible,
+                        style: const TextStyle(
+                          color: _mutedInk,
+                          fontSize: 13,
+                          height: 1.3,
                         ),
-                      )
-                    : Column(
-                        children: [
-                          for (
-                            var index = 0;
-                            index < events.length;
-                            index++
-                          ) ...[
-                            _AgendaEvent(
-                              event: events[index],
-                              onTap: onEventTap,
+                      ),
+                    )
+                  : Column(
+                      children: [
+                        for (
+                          var index = 0;
+                          index < events.length;
+                          index++
+                        ) ...[
+                          _AgendaEvent(
+                            event: events[index],
+                            onTap: onEventTap,
+                          ),
+                          if (index != events.length - 1)
+                            _AgendaGap(
+                              gapStartMinutes: events[index].endMinutes,
+                              gapEndMinutes: events[index + 1].startMinutes,
                             ),
-                            if (index != events.length - 1)
-                              const SizedBox(height: 12),
-                          ],
                         ],
-                      ),
-              ),
-            ],
-          ),
+                      ],
+                    ),
+            ),
+          ],
         ),
       ),
     );
@@ -1202,6 +1265,40 @@ class _AgendaEvent extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Separator between two events of the same overview day.
+///
+/// Events that run back to back keep a quiet spacing. When the day holds
+/// unbooked time between them, the separator sinks below the row surface so
+/// the free stretch stays visible at a glance.
+class _AgendaGap extends StatelessWidget {
+  const _AgendaGap({
+    required this.gapStartMinutes,
+    required this.gapEndMinutes,
+  });
+
+  final int gapStartMinutes;
+  final int gapEndMinutes;
+
+  @override
+  Widget build(BuildContext context) {
+    // A zero end minute means the event runs to midnight, so whatever follows
+    // either overlaps it or starts on the next day. Neither is unbooked time.
+    if (gapStartMinutes == 0 || gapEndMinutes <= gapStartMinutes) {
+      return const SizedBox(height: 12);
+    }
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Container(
+        height: 14,
+        decoration: BoxDecoration(
+          color: WeekraColors.dayGap,
+          borderRadius: BorderRadius.circular(4),
         ),
       ),
     );
