@@ -249,38 +249,23 @@ class _SectionContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedSwitcher(
-      duration: WeekraMotion.resolve(context, WeekraMotion.content),
-      switchInCurve: WeekraMotion.emphasized,
-      switchOutCurve: WeekraMotion.standard,
-      transitionBuilder: (child, animation) => FadeTransition(
-        opacity: animation,
-        child: SlideTransition(
-          position: Tween<Offset>(
-            begin: const Offset(0.025, 0),
-            end: Offset.zero,
-          ).animate(animation),
-          child: child,
-        ),
-      ),
-      child: ListView(
-        key: ValueKey(section),
-        padding: const EdgeInsets.fromLTRB(36, 34, 36, 36),
-        children: [
-          _SectionHeader(section: section),
-          const SizedBox(height: 26),
-          if (section == _SettingsSection.calendar)
-            _CalendarCard(panel: panel)
-          else if (section == _SettingsSection.categories)
-            _CategoriesCard(panel: panel)
-          else if (section == _SettingsSection.appearance)
-            _AppearanceCard(panel: panel)
-          else if (section == _SettingsSection.language)
-            _LanguageCard(panel: panel)
-          else
-            _AboutCards(panel: panel),
-        ],
-      ),
+    return ListView(
+      key: ValueKey(section),
+      padding: const EdgeInsets.fromLTRB(36, 34, 36, 36),
+      children: [
+        _SectionHeader(section: section),
+        const SizedBox(height: 26),
+        if (section == _SettingsSection.calendar)
+          _CalendarCard(panel: panel)
+        else if (section == _SettingsSection.categories)
+          _CategoriesCard(panel: panel)
+        else if (section == _SettingsSection.appearance)
+          _AppearanceCard(panel: panel)
+        else if (section == _SettingsSection.language)
+          _LanguageCard(panel: panel)
+        else
+          _AboutCards(panel: panel),
+      ],
     );
   }
 }
@@ -368,46 +353,58 @@ class _CalendarCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 22),
-          AnimatedSwitcher(
-            duration: WeekraMotion.resolve(context, WeekraMotion.content),
-            child: settings.anchorMode == CalendarAnchorMode.today
-                ? _CalendarChoiceGroup(
-                    key: const ValueKey('today-position'),
-                    title: l10n.settingsTodayPosition,
-                    description: l10n.settingsTodayPositionDescription,
-                    children: [
-                      for (var index = 0; index < 7; index++)
-                        ChoiceChip(
-                          key: Key('calendar-today-column-$index'),
-                          label: Text(l10n.settingsColumnNumber(index + 1)),
-                          selected: settings.todayColumn == index,
-                          onSelected: (_) => _setCalendar(
-                            settings.copyWith(todayColumn: index),
-                          ),
-                        ),
-                    ],
-                  )
-                : _CalendarChoiceGroup(
-                    key: const ValueKey('week-start'),
-                    title: l10n.settingsWeekStartsOn,
-                    description: l10n.settingsWeekStartsOnDescription,
-                    children: [
-                      for (
-                        var weekday = DateTime.monday;
-                        weekday <= DateTime.sunday;
-                        weekday++
-                      )
-                        ChoiceChip(
-                          key: Key('calendar-week-start-$weekday'),
-                          label: Text(_weekdayName(context, weekday)),
-                          selected: settings.weekStartsOn == weekday,
-                          onSelected: (_) => _setCalendar(
-                            settings.copyWith(weekStartsOn: weekday),
-                          ),
-                        ),
-                    ],
+          if (settings.anchorMode == CalendarAnchorMode.today)
+            _CalendarChoiceGroup(
+              key: const ValueKey('today-position'),
+              title: l10n.settingsTodayPosition,
+              description: l10n.settingsTodayPositionDescription,
+              children: [
+                for (var index = 0; index < 7; index++)
+                  ChoiceChip(
+                    key: Key('calendar-today-column-$index'),
+                    label: Text(
+                      l10n.settingsColumnNumber(index + 1),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    labelStyle: _columnChipLabelStyle,
+                    labelPadding: _columnChipLabelPadding,
+                    padding: _columnChipPadding,
+                    selected: settings.todayColumn == index,
+                    onSelected: (_) => _setCalendar(
+                      settings.copyWith(todayColumn: index),
+                    ),
                   ),
-          ),
+              ],
+            )
+          else
+            _CalendarChoiceGroup(
+              key: const ValueKey('week-start'),
+              title: l10n.settingsWeekStartsOn,
+              description: l10n.settingsWeekStartsOnDescription,
+              children: [
+                for (
+                  var weekday = DateTime.monday;
+                  weekday <= DateTime.sunday;
+                  weekday++
+                )
+                  ChoiceChip(
+                    key: Key('calendar-week-start-$weekday'),
+                    label: Text(
+                      _weekdayName(context, weekday),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    labelStyle: _columnChipLabelStyle,
+                    labelPadding: _columnChipLabelPadding,
+                    padding: _columnChipPadding,
+                    selected: settings.weekStartsOn == weekday,
+                    onSelected: (_) => _setCalendar(
+                      settings.copyWith(weekStartsOn: weekday),
+                    ),
+                  ),
+              ],
+            ),
         ],
       ),
     );
@@ -417,6 +414,12 @@ class _CalendarCard extends StatelessWidget {
     panel.onChanged(panel.settings.copyWith(calendar: value));
   }
 }
+
+/// The seven per-column chips have to fit a single row, so they use tighter
+/// metrics than the default chip.
+const _columnChipLabelStyle = TextStyle(fontSize: 12);
+const _columnChipLabelPadding = EdgeInsets.symmetric(horizontal: 2);
+const _columnChipPadding = EdgeInsets.symmetric(horizontal: 6, vertical: 8);
 
 class _CalendarChoiceGroup extends StatelessWidget {
   const _CalendarChoiceGroup({
@@ -439,7 +442,16 @@ class _CalendarChoiceGroup extends StatelessWidget {
         const SizedBox(height: 5),
         Text(description, style: Theme.of(context).textTheme.bodySmall),
         const SizedBox(height: 12),
-        Wrap(spacing: 8, runSpacing: 8, children: children),
+        // The column chips form one even row. Wrapping left the seventh column
+        // alone on a second line, which read as an unbalanced grid.
+        Row(
+          children: [
+            for (var index = 0; index < children.length; index++) ...[
+              if (index > 0) const SizedBox(width: 6),
+              Expanded(child: children[index]),
+            ],
+          ],
+        ),
       ],
     );
   }
