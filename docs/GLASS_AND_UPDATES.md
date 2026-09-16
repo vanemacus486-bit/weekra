@@ -9,9 +9,10 @@
 - https://github.com/whynotmake-it/flutter_liquid_glass
 - https://github.com/sdegenaar/liquid_glass_widgets/blob/main/docs/PLATFORM_SUPPORT.md
   Windows uses Skia; that project's premium backdrop refraction is unavailable
-  there. Weekra uses clipped backdrop blur and a directional rim, with no shader
-  dependency. This is frosted glass, not a claim of pixel-identical Liquid Glass
-  refraction. Whole-calendar lateral motion has been removed.
+  there. Weekra uses clipped backdrop blur, layered tint/specular gradients, a
+  dual directional rim, and restrained pointer-responsive light with no shader
+  dependency. This is responsive frosted glass, not a claim of pixel-identical
+  Liquid Glass refraction. Whole-calendar lateral motion has been removed.
 
 ## Behavior
 
@@ -29,6 +30,14 @@ adds a rounded surface and stronger foreground, while press adds a darker state
 and a short compression/release. Ripple splashes are intentionally disabled so
 the response stays anchored to the control. Press motion becomes instantaneous
 when the operating system requests reduced animation.
+
+Glass light starts at the upper-left edge and follows the pointer within the
+surface on desktop. Base tint, top-to-bottom transmission, local specular
+light, outer rim, inner edge, and shadow are separate layers. Touch platforms
+retain the validated static frosted profile instead of paying for pointer-only
+lighting. The selected segmented thumb stays brighter but does not run a second
+pointer response inside its parent. When reduced motion is enabled, light and
+shadow changes settle immediately.
 
 ## Update delivery
 

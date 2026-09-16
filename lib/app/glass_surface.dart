@@ -5,12 +5,205 @@ import 'package:flutter/physics.dart';
 import 'package:weekra/app/weekra_design.dart';
 
 /// Frosted material with a directional rim. Works on Windows' Skia renderer.
-class GlassSurface extends StatelessWidget {
+class GlassSurface extends StatefulWidget {
   const GlassSurface({
     super.key,
     required this.child,
     this.radius = 22,
     this.thumb = false,
+    this.responsive = true,
+  });
+
+  final Widget child;
+  final double radius;
+  final bool thumb;
+  final bool responsive;
+
+  @override
+  State<GlassSurface> createState() => _GlassSurfaceState();
+}
+
+class _GlassSurfaceState extends State<GlassSurface> {
+  static const _restingLight = Alignment(-.72, -.92);
+
+  Alignment _pointerLight = _restingLight;
+  bool _hovered = false;
+
+  void _updateLight(Offset localPosition) {
+    final size = context.size;
+    if (size == null || size.isEmpty) return;
+    final next = Alignment(
+      (((localPosition.dx / size.width) * 2 - 1).clamp(-1.0, 1.0) * .82)
+          .toDouble(),
+      (((localPosition.dy / size.height) * 2 - 1).clamp(-1.0, 1.0) * .82)
+          .toDouble(),
+    );
+    if ((next.x - _pointerLight.x).abs() < .025 &&
+        (next.y - _pointerLight.y).abs() < .025) {
+      return;
+    }
+    setState(() => _pointerLight = next);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final desktop = switch (theme.platform) {
+      TargetPlatform.windows ||
+      TargetPlatform.macOS ||
+      TargetPlatform.linux => true,
+      TargetPlatform.android ||
+      TargetPlatform.iOS ||
+      TargetPlatform.fuchsia => false,
+    };
+    if (!desktop) {
+      return _StaticGlassSurface(
+        radius: widget.radius,
+        thumb: widget.thumb,
+        child: widget.child,
+      );
+    }
+
+    final shape = BorderRadius.circular(widget.radius);
+    final duration = WeekraMotion.resolve(context, WeekraMotion.control);
+    final accent = theme.colorScheme.primary;
+    final pointerResponsive = widget.responsive && desktop;
+    final targetLight = pointerResponsive && _hovered
+        ? _pointerLight
+        : _restingLight;
+    return MouseRegion(
+      onEnter: pointerResponsive
+          ? (event) {
+              _updateLight(event.localPosition);
+              setState(() => _hovered = true);
+            }
+          : null,
+      onHover: pointerResponsive
+          ? (event) => _updateLight(event.localPosition)
+          : null,
+      onExit: pointerResponsive
+          ? (_) => setState(() => _hovered = false)
+          : null,
+      child: AnimatedContainer(
+        duration: duration,
+        curve: WeekraMotion.standard,
+        decoration: BoxDecoration(
+          borderRadius: shape,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(
+                alpha: widget.thumb ? .25 : (_hovered ? .38 : .32),
+              ),
+              blurRadius: widget.thumb ? 9 : (_hovered ? 36 : 30),
+              spreadRadius: widget.thumb ? -.5 : -2,
+              offset: Offset(0, widget.thumb ? 3 : (_hovered ? 14 : 11)),
+            ),
+            if (!widget.thumb)
+              BoxShadow(
+                color: accent.withValues(alpha: _hovered ? .045 : .025),
+                blurRadius: _hovered ? 22 : 16,
+                spreadRadius: -7,
+              ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: shape,
+          child: BackdropFilter(
+            filter: ui.ImageFilter.blur(
+              sigmaX: widget.thumb ? 18 : 24,
+              sigmaY: widget.thumb ? 18 : 24,
+            ),
+            child: TweenAnimationBuilder<Alignment>(
+              tween: Tween<Alignment>(end: targetLight),
+              duration: duration,
+              curve: WeekraMotion.standard,
+              builder: (context, light, _) => Stack(
+                children: [
+                  Positioned.fill(
+                    child: DecoratedBox(
+                      key: const Key('glass-base-layer'),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: const Alignment(-1, -1),
+                          end: const Alignment(1, 1),
+                          colors: widget.thumb
+                              ? const [Color(0xA66C727C), Color(0x78404750)]
+                              : const [Color(0xB832363D), Color(0xC21A1D22)],
+                        ),
+                      ),
+                    ),
+                  ),
+                  Positioned.fill(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.white.withValues(
+                              alpha: widget.thumb ? .085 : .055,
+                            ),
+                            Colors.transparent,
+                            accent.withValues(
+                              alpha: widget.thumb ? .035 : .022,
+                            ),
+                          ],
+                          stops: const [0, .46, 1],
+                        ),
+                      ),
+                    ),
+                  ),
+                  Positioned.fill(
+                    child: DecoratedBox(
+                      key: const Key('glass-specular-layer'),
+                      decoration: BoxDecoration(
+                        gradient: RadialGradient(
+                          center: light,
+                          radius: widget.thumb ? .92 : 1.08,
+                          colors: [
+                            Colors.white.withValues(
+                              alpha: widget.thumb
+                                  ? .20
+                                  : (_hovered ? .145 : .09),
+                            ),
+                            Colors.white.withValues(
+                              alpha: widget.thumb ? .055 : .025,
+                            ),
+                            Colors.transparent,
+                          ],
+                          stops: const [0, .34, 1],
+                        ),
+                      ),
+                    ),
+                  ),
+                  CustomPaint(
+                    foregroundPainter: _GlassRim(
+                      radius: widget.radius,
+                      thumb: widget.thumb,
+                      light: light,
+                      hovered: _hovered,
+                    ),
+                    child: Material(
+                      type: MaterialType.transparency,
+                      child: widget.child,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Stable, low-cost profile for touch platforms without pointer lighting.
+class _StaticGlassSurface extends StatelessWidget {
+  const _StaticGlassSurface({
+    required this.child,
+    required this.radius,
+    required this.thumb,
   });
 
   final Widget child;
@@ -42,12 +235,12 @@ class GlassSurface extends StatelessWidget {
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: thumb
-                    ? [const Color(0x806F747C), const Color(0x40424750)]
-                    : [const Color(0xD032353B), const Color(0xD9202228)],
+                    ? const [Color(0x806F747C), Color(0x40424750)]
+                    : const [Color(0xD032353B), Color(0xD9202228)],
               ),
             ),
             child: CustomPaint(
-              foregroundPainter: _GlassRim(radius: radius, thumb: thumb),
+              foregroundPainter: _StaticGlassRim(radius: radius, thumb: thumb),
               child: Material(type: MaterialType.transparency, child: child),
             ),
           ),
@@ -57,10 +250,12 @@ class GlassSurface extends StatelessWidget {
   }
 }
 
-class _GlassRim extends CustomPainter {
-  const _GlassRim({required this.radius, required this.thumb});
+class _StaticGlassRim extends CustomPainter {
+  const _StaticGlassRim({required this.radius, required this.thumb});
+
   final double radius;
   final bool thumb;
+
   @override
   void paint(Canvas canvas, Size size) {
     final rect = (Offset.zero & size).deflate(.6);
@@ -84,8 +279,71 @@ class _GlassRim extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_GlassRim oldDelegate) =>
+  bool shouldRepaint(_StaticGlassRim oldDelegate) =>
       oldDelegate.radius != radius || oldDelegate.thumb != thumb;
+}
+
+class _GlassRim extends CustomPainter {
+  const _GlassRim({
+    required this.radius,
+    required this.thumb,
+    required this.light,
+    required this.hovered,
+  });
+  final double radius;
+  final bool thumb;
+  final Alignment light;
+  final bool hovered;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = (Offset.zero & size).deflate(.6);
+    final outerPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1
+      ..shader = LinearGradient(
+        begin: light,
+        end: Alignment(-light.x, -light.y),
+        colors: [
+          Colors.white.withValues(alpha: thumb ? .72 : (hovered ? .42 : .32)),
+          Colors.white.withValues(alpha: thumb ? .10 : .055),
+          Colors.white.withValues(alpha: thumb ? .28 : .14),
+        ],
+        stops: const [0, .48, 1],
+      ).createShader(rect);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(rect, Radius.circular(radius)),
+      outerPaint,
+    );
+
+    final innerRect = rect.deflate(1.15);
+    final innerPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = .55
+      ..shader = LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [
+          Colors.white.withValues(alpha: thumb ? .18 : .105),
+          Colors.white.withValues(alpha: .012),
+          Colors.black.withValues(alpha: thumb ? .08 : .12),
+        ],
+      ).createShader(innerRect);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        innerRect,
+        Radius.circular((radius - 1.15).clamp(0, radius).toDouble()),
+      ),
+      innerPaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_GlassRim oldDelegate) =>
+      oldDelegate.radius != radius ||
+      oldDelegate.thumb != thumb ||
+      oldDelegate.light != light ||
+      oldDelegate.hovered != hovered;
 }
 
 /// One persistent thumb: taps retarget the running spring; drags track the hand.
@@ -187,6 +445,7 @@ class _GlassSegmentedControlState extends State<GlassSegmentedControl>
                   width: itemWidth,
                   child: const GlassSurface(
                     thumb: true,
+                    responsive: false,
                     radius: 19,
                     child: SizedBox.expand(),
                   ),

@@ -79,6 +79,8 @@ The first UI slice is in place:
   names/colors, theme/language changes, and update status
 - Rounded hover surfaces, distinct pressed colors, and restrained press motion
   across toolbar, dialog, and settings controls
+- Layered glass surfaces with lighter tinting, dual-edge definition, and a
+  restrained highlight that follows the pointer on desktop
 - Pseudo-localization plus small-screen and large-type layout tests
 
 Direct event manipulation uses 15-minute snapping, tactile feedback, and live
