@@ -3,6 +3,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:weekra/app/glass_surface.dart';
 import 'package:weekra/app/weekra_design.dart';
 import 'package:weekra/app/weekra_app.dart';
 import 'package:weekra/features/calendar/data/calendar_event_store.dart';
@@ -364,6 +365,52 @@ void main() {
       find.byKey(const Key('week-hourly-layout')).hitTestable(),
       findsOneWidget,
     );
+  });
+
+  testWidgets('glass specular light follows and releases the pointer', (
+    tester,
+  ) async {
+    _useViewport(tester, const Size(600, 400));
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: WeekraDesign.dark(),
+        home: const Center(
+          child: GlassSurface(
+            key: Key('responsive-glass-test'),
+            child: SizedBox(width: 220, height: 100),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final surface = find.byKey(const Key('responsive-glass-test'));
+    final specular = find.descendant(
+      of: surface,
+      matching: find.byKey(const Key('glass-specular-layer')),
+    );
+    expect(specular, findsOneWidget);
+    final rect = tester.getRect(surface);
+    final pointer = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    await pointer.addPointer(location: rect.center);
+    await pointer.moveTo(Offset(rect.right - 5, rect.top + 5));
+    await tester.pumpAndSettle();
+
+    RadialGradient gradient() {
+      final box = tester.widget<DecoratedBox>(specular);
+      return (box.decoration as BoxDecoration).gradient! as RadialGradient;
+    }
+
+    final followed = gradient().center as Alignment;
+    expect(followed.x, greaterThan(.65));
+    expect(followed.y, lessThan(-.65));
+
+    await pointer.moveTo(const Offset(10, 10));
+    await tester.pumpAndSettle();
+    final released = gradient().center as Alignment;
+    expect(released.x, closeTo(-.72, .01));
+    expect(released.y, closeTo(-.92, .01));
+    await pointer.removePointer();
   });
 
   for (final size in [const Size(1280, 800), const Size(320, 568)]) {
