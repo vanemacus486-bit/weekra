@@ -149,7 +149,6 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const Key('timeline-next-day')));
-    await tester.pump();
     await tester.pump(const Duration(milliseconds: 70));
     final incoming = find.byKey(const ValueKey('hourly-header-20260912'));
     expect(
@@ -249,6 +248,7 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const Key('timeline-next-day')));
+    await tester.pump();
     await tester.pump(const Duration(milliseconds: 70));
 
     final incomingLayer = find.byWidgetPredicate((widget) {
