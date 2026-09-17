@@ -401,7 +401,8 @@ class _WeekHourlyLayoutState extends State<_WeekHourlyLayout> {
       _resizeOrigin = event;
       _resizingEvent = event;
       _resizeEdge = edge;
-      _focusMinute = (event.startMinutes + event.endMinutes) ~/ 2;
+      // No `_focusMinute` here either: rescaling the grid while the pointer is
+      // already down slides the edge out from under it.
       _lastFeedbackStep = null;
     });
     HapticFeedback.selectionClick();

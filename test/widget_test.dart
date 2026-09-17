@@ -1625,17 +1625,26 @@ void main() {
     expect(store.savedEvents.single.start, original.start);
     expect(store.savedEvents.single.end, original.end);
 
-    // Pressing the block's own bottom edge only stretches the end time.
-    final surface = tester.getRect(surfaceFinder());
-    final beforeEdge = store.savedEvents.single;
-    await dragFrom(
-      Offset(surface.center.dx, surface.bottom - 2),
-      const Offset(0, 40),
+    // A press may rescale the grid — selecting an event zooms the two hours
+    // around it — so judge by what happened to the event rather than by block
+    // pixels: dragging down from the bottom edge must stretch the end and leave
+    // the start alone. The grid used to be rescaled on pointer-down, which slid
+    // the block out from under the pointer and turned this into a whole-block
+    // move onto the next day.
+    final pressed = tester.getRect(surfaceFinder());
+    final press = await tester.startGesture(
+      Offset(pressed.center.dx, pressed.bottom - 2),
+      kind: PointerDeviceKind.mouse,
     );
+    await tester.pump();
+    await press.moveBy(const Offset(0, 40));
+    await tester.pump();
+    await press.up();
+    await tester.pumpAndSettle();
+
     final resized = store.savedEvents.single;
-    expect(resized.start, beforeEdge.start);
-    expect(resized.end.isAfter(beforeEdge.end), isTrue);
-    expect(resized.start.day, original.start.day);
+    expect(resized.start, original.start);
+    expect(resized.end.isAfter(original.end), isTrue);
 
     // Pressing the middle of the block still moves it to another day without
     // touching its duration.

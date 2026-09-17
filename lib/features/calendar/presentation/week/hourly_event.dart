@@ -101,6 +101,12 @@ class _GridEventState extends State<_GridEvent> {
     _ => null,
   };
 
+  /// Intent read at pointer-down, before selecting the event rescales the grid
+  /// and slides the block out from under the pointer.
+  /// [_hasPressIntent] separates "not classified yet" from a real [none].
+  _DragIntent _pressIntent = _DragIntent.none;
+  bool _hasPressIntent = false;
+
   /// Decides what a press at [position] is going to do.
   ///
   /// The gesture surface reaches further than the visible block: short events
@@ -245,7 +251,20 @@ class _GridEventState extends State<_GridEvent> {
                       key: eventKey,
                       behavior: HitTestBehavior.opaque,
                       dragStartBehavior: DragStartBehavior.down,
-                      onTapDown: (_) => onFocus(),
+                      onTapDown: (details) {
+                        // Classify with the geometry the press actually landed
+                        // on. Selecting the event zooms the two hours around it
+                        // right afterwards, which slides the block out from
+                        // under the pointer — reading the intent here keeps a
+                        // press on the bottom edge from becoming a move.
+                        _pressIntent = _intentAt(
+                          details.localPosition,
+                          bodyOffset: bodyOffset,
+                          bodyHeight: bodyHeight,
+                        );
+                        _hasPressIntent = true;
+                        onFocus();
+                      },
                       onSecondaryTapDown: desktopPointers
                           ? (_) => onFocus()
                           : null,
@@ -270,11 +289,18 @@ class _GridEventState extends State<_GridEvent> {
                           : null,
                       onPanStart: desktopPointers
                           ? (details) {
-                              final intent = _intentAt(
-                                details.localPosition,
-                                bodyOffset: bodyOffset,
-                                bodyHeight: bodyHeight,
-                              );
+                              // Keep using the intent the press was classified
+                              // with. If the arena re-runs this gesture (the
+                              // grid can relayout mid-drag) recomputing from
+                              // the current geometry would read the block's
+                              // middle instead of the edge that was grabbed.
+                              final intent = _hasPressIntent
+                                  ? _pressIntent
+                                  : _intentAt(
+                                      details.localPosition,
+                                      bodyOffset: bodyOffset,
+                                      bodyHeight: bodyHeight,
+                                    );
                               setState(() {
                                 _activeIntent = intent;
                                 _hoverIntent = intent;
