@@ -225,6 +225,62 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('timeline slide reveals only the newly entering date', (
+    tester,
+  ) async {
+    _useViewport(tester, const Size(1280, 800));
+    final now = DateTime(2026, 9, 14, 13, 30);
+    final sharedEvent = CalendarEvent(
+      id: 'shared-during-navigation',
+      title: 'Shared event',
+      start: DateTime(2026, 9, 12, 9),
+      end: DateTime(2026, 9, 12, 10),
+      color: const Color(0xFFFF7B6F),
+    );
+    await tester.pumpWidget(
+      WeekraApp(
+        eventStore: _MemoryEventStore([sharedEvent]),
+        locale: const Locale('en'),
+        enableAutomaticUpdates: false,
+        clock: () => now,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('timeline-next-day')));
+    await tester.pump(const Duration(milliseconds: 70));
+
+    final incomingLayer = find.byWidgetPredicate((widget) {
+      final key = widget.key;
+      return key is ValueKey<String> &&
+          key.value.startsWith('flowing-date-layer-') &&
+          key.value.contains('hourly-canvas-20260912');
+    });
+    expect(incomingLayer, findsOneWidget);
+    final layerClip = find.descendant(
+      of: incomingLayer,
+      matching: find.byWidgetPredicate(
+        (widget) => widget is ClipRect && widget.clipper != null,
+      ),
+    );
+    expect(layerClip, findsOneWidget);
+
+    final viewportSize = tester.getSize(incomingLayer);
+    final clipper = tester.widget<ClipRect>(layerClip).clipper!;
+    final visibleIncoming = clipper.getClip(viewportSize);
+    final dayWidth = viewportSize.width / 7;
+    expect(visibleIncoming.width, greaterThan(0));
+    expect(visibleIncoming.width, lessThan(dayWidth));
+    expect(visibleIncoming.right, closeTo(viewportSize.width, .1));
+
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('hourly-canvas-20260912')),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('single click starts at the containing whole hour', (
     tester,
   ) async {

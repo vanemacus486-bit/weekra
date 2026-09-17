@@ -122,7 +122,13 @@ class _FlowingDateSwitcherState extends State<_FlowingDateSwitcher>
             _outgoingBeginOffset +
             (_outgoingEndOffset - _outgoingBeginOffset) * progress;
         final incomingOffset = _incomingBeginOffset * (1 - progress);
-        final seamExtent = incomingOffset.abs();
+        // Adjacent timeline windows share six of their seven dates. Drawing
+        // both complete canvases during the slide briefly duplicates every
+        // shared event: the outgoing copy has already moved one column while
+        // the incoming copy is still near its old screen position. Keep the
+        // outgoing canvas as the single source for shared dates and reveal
+        // only the edge that is genuinely entering the viewport.
+        final enteringExtent = _incomingBeginOffset.abs() * progress;
         final movesForward = _transitionDirection > 0;
         return Stack(
           fit: StackFit.expand,
@@ -130,10 +136,8 @@ class _FlowingDateSwitcherState extends State<_FlowingDateSwitcher>
             _FlowingDateLayer(
               key: _layerKey(outgoingChild),
               horizontalOffset: outgoingOffset,
-              clip: movesForward
-                  ? _FlowingDateClip.leading
-                  : _FlowingDateClip.trailing,
-              clipExtent: seamExtent,
+              clip: _FlowingDateClip.full,
+              clipExtent: 0,
               interactive: false,
               child: outgoingChild,
             ),
@@ -141,9 +145,9 @@ class _FlowingDateSwitcherState extends State<_FlowingDateSwitcher>
               key: _layerKey(_currentChild),
               horizontalOffset: incomingOffset,
               clip: movesForward
-                  ? _FlowingDateClip.exceptLeading
-                  : _FlowingDateClip.exceptTrailing,
-              clipExtent: seamExtent,
+                  ? _FlowingDateClip.trailing
+                  : _FlowingDateClip.leading,
+              clipExtent: enteringExtent,
               interactive: true,
               child: _currentChild,
             ),
@@ -157,7 +161,7 @@ class _FlowingDateSwitcherState extends State<_FlowingDateSwitcher>
       ValueKey('flowing-date-layer-${child.key}');
 }
 
-enum _FlowingDateClip { full, leading, trailing, exceptLeading, exceptTrailing }
+enum _FlowingDateClip { full, leading, trailing }
 
 class _FlowingDateLayer extends StatelessWidget {
   const _FlowingDateLayer({
@@ -214,18 +218,6 @@ class _FlowingDateClipper extends CustomClipper<Rect> {
         size.width - clippedExtent,
         0,
         clippedExtent,
-        size.height,
-      ),
-      _FlowingDateClip.exceptLeading => Rect.fromLTWH(
-        clippedExtent,
-        0,
-        size.width - clippedExtent,
-        size.height,
-      ),
-      _FlowingDateClip.exceptTrailing => Rect.fromLTWH(
-        0,
-        0,
-        size.width - clippedExtent,
         size.height,
       ),
     };
@@ -750,4 +742,3 @@ class _MinuteRule extends StatelessWidget {
     );
   }
 }
-
