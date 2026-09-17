@@ -263,7 +263,7 @@ class _AgendaDay extends StatelessWidget {
                       : null,
                 ),
                 child: Padding(
-                  padding: const EdgeInsetsDirectional.fromSTEB(16, 12, 18, 12),
+                  padding: const EdgeInsetsDirectional.fromSTEB(18, 12, 18, 12),
                   child: events.isEmpty
                       ? const SizedBox(height: 44)
                       : Column(
@@ -278,10 +278,7 @@ class _AgendaDay extends StatelessWidget {
                                 onTap: onEventTap,
                               ),
                               if (index != events.length - 1)
-                                _AgendaGap(
-                                  gapStartMinutes: events[index].endMinutes,
-                                  gapEndMinutes: events[index + 1].startMinutes,
-                                ),
+                                const SizedBox(height: 8),
                             ],
                           ],
                         ),
@@ -307,107 +304,69 @@ class _AgendaEvent extends StatelessWidget {
     final start = _formatTime(context, event.startMinutes);
     final end = _formatTime(context, event.endMinutes);
     final isAllDay = _isAllDayEvent(event);
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: () => onTap(event),
-      child: Container(
-        padding: const EdgeInsetsDirectional.fromSTEB(12, 9, 10, 9),
-        decoration: BoxDecoration(
-          gradient: WeekraEventStyle.gradient(event.color),
-          border: Border.all(
-            color: event.color.withValues(alpha: .20),
-            width: .75,
-          ),
-          borderRadius: BorderRadius.circular(WeekraMetrics.eventRadius),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Flexible(
-              child: Text(
-                isAllDay ? l10n.allDay : '$start\n$end',
-                maxLines: 2,
-                overflow: TextOverflow.fade,
-                softWrap: false,
-                style: const TextStyle(
-                  color: _mutedInk,
-                  fontSize: 11,
-                  height: 1.45,
-                  fontFeatures: [FontFeature.tabularFigures()],
-                ),
-              ),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              flex: 2,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    event.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: _ink,
-                      fontSize: 15,
-                      height: 1.25,
-                      fontWeight: FontWeight.w500,
-                    ),
+    final timeLabel = isAllDay ? l10n.allDay : '$start  –  $end';
+    final metadata = event.location == null
+        ? timeLabel
+        : '$timeLabel  ·  ${event.location}';
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => onTap(event),
+        child: ConstrainedBox(
+          key: Key('overview-event-${event.id}'),
+          constraints: const BoxConstraints(minHeight: 44),
+          child: Padding(
+            padding: const EdgeInsetsDirectional.symmetric(vertical: 4),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  key: Key('overview-event-marker-${event.id}'),
+                  width: 4,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: event.color,
+                    borderRadius: BorderRadius.circular(2),
                   ),
-                  if (event.location != null) ...[
-                    const SizedBox(height: 3),
-                    Text(
-                      event.location!,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: _mutedInk,
-                        fontSize: 12,
-                        height: 1.25,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        event.title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: _ink,
+                          fontSize: 15,
+                          height: 1.2,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
-                    ),
-                  ],
-                ],
-              ),
+                      const SizedBox(height: 2),
+                      Text(
+                        metadata,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        softWrap: false,
+                        style: const TextStyle(
+                          color: _mutedInk,
+                          fontSize: 11,
+                          height: 1.3,
+                          fontFeatures: [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
   }
 }
-
-/// Separator between two events of the same overview day.
-///
-/// Events that run back to back keep a quiet spacing. When the day holds
-/// unbooked time between them, the separator sinks below the row surface so
-/// the free stretch stays visible at a glance.
-class _AgendaGap extends StatelessWidget {
-  const _AgendaGap({
-    required this.gapStartMinutes,
-    required this.gapEndMinutes,
-  });
-
-  final int gapStartMinutes;
-  final int gapEndMinutes;
-
-  @override
-  Widget build(BuildContext context) {
-    // A zero end minute means the event runs to midnight, so whatever follows
-    // either overlaps it or starts on the next day. Neither is unbooked time.
-    if (gapStartMinutes == 0 || gapEndMinutes <= gapStartMinutes) {
-      return const SizedBox(height: 12);
-    }
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
-      child: Container(
-        height: 14,
-        decoration: BoxDecoration(
-          color: WeekraColors.dayGap,
-          borderRadius: BorderRadius.circular(4),
-        ),
-      ),
-    );
-  }
-}
-

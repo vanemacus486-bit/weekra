@@ -895,6 +895,30 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('uses compact marker-led event rows in the overview', (
+    tester,
+  ) async {
+    _useViewport(tester, const Size(390, 844));
+    final event = _eventOnToday('Compact overview event');
+    await tester.pumpWidget(
+      WeekraApp(
+        eventStore: _MemoryEventStore([event]),
+        locale: const Locale('en'),
+        enableAutomaticUpdates: false,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final row = find.byKey(Key('overview-event-${event.id}'));
+    final marker = find.byKey(Key('overview-event-marker-${event.id}'));
+    expect(row.hitTestable(), findsOneWidget);
+    // Font metrics vary by platform, but the agenda row should remain close to
+    // the 44 px touch target instead of expanding into a filled event card.
+    expect(tester.getSize(row).height, lessThanOrEqualTo(60));
+    expect(tester.getSize(marker), const Size(4, 36));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('the overview streams past a single week', (tester) async {
     _useViewport(tester, const Size(1280, 800));
     _useDesktopPlatform();
