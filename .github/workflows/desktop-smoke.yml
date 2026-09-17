@@ -72,9 +72,13 @@ jobs:
           sleep 2
           scrot -o -u desktop-smoke/01-hourly-wide.png
 
+          xdotool mousemove --window "$window_id" 1089 35 click 1
+          sleep 1
+          scrot -o -u desktop-smoke/02-month-wide.png
+
           xdotool mousemove --window "$window_id" 1007 35 click 1
           sleep 1
-          scrot -o -u desktop-smoke/02-overview-wide.png
+          scrot -o -u desktop-smoke/03-day-wide.png
 
           xdotool mousemove --window "$window_id" 1171 35 click 1
           sleep 0.08
@@ -85,13 +89,13 @@ jobs:
 
           xdotool mousemove --window "$window_id" 1190 700 click 3
           sleep 1
-          scrot -o -u desktop-smoke/03-time-adjust-card.png
+          scrot -o -u desktop-smoke/04-time-adjust-card.png
           xdotool key Escape
           sleep 0.4
 
           xdotool windowsize --sync "$window_id" 900 700
           sleep 1
-          scrot -o -u desktop-smoke/04-hourly-narrow.png
+          scrot -o -u desktop-smoke/05-hourly-narrow.png
 
           xdotool windowsize --sync "$window_id" 1280 800
           sleep 0.5
@@ -99,13 +103,14 @@ jobs:
           xdotool mousemove --sync --window "$window_id" 835 390
           xdotool mouseup 1
           sleep 1
-          scrot -o -u desktop-smoke/05-create-event-card.png
+          scrot -o -u desktop-smoke/06-create-event-card.png
 
           test -s desktop-smoke/01-hourly-wide.png
-          test -s desktop-smoke/02-overview-wide.png
-          test -s desktop-smoke/03-time-adjust-card.png
-          test -s desktop-smoke/04-hourly-narrow.png
-          test -s desktop-smoke/05-create-event-card.png
+          test -s desktop-smoke/02-month-wide.png
+          test -s desktop-smoke/03-day-wide.png
+          test -s desktop-smoke/04-time-adjust-card.png
+          test -s desktop-smoke/05-hourly-narrow.png
+          test -s desktop-smoke/06-create-event-card.png
 
       - name: Upload screenshots and logs
         if: always()
