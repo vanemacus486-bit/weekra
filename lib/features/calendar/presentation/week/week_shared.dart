@@ -9,7 +9,7 @@ const _gridSnapMinutes = 15;
 const _minimumEventMinutes = 15;
 const _defaultEventMinutes = 60;
 
-enum _WeekLayout { hourly, grid }
+enum _WeekLayout { hourly, grid, month }
 
 enum _ResizeEdge { start, end }
 

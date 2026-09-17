@@ -74,8 +74,8 @@ jobs:
             # Close the details sheet and continue in the already-rendered app.
             adb shell input keyevent KEYCODE_BACK
             sleep 1
-            # The switcher's left half is the hourly layout at this density.
-            adb shell input tap 710 355
+            # The switcher's right segment is the week layout at this density.
+            adb shell input tap 970 355
             sleep 2
             adb exec-out screencap -p >android-smoke/03-mobile-hourly.png
             if cmp -s android-smoke/01-mobile-overview.png android-smoke/03-mobile-hourly.png; then echo "Hourly layout did not open" >&2; exit 1; fi

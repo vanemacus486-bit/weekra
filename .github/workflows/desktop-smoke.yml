@@ -72,15 +72,15 @@ jobs:
           sleep 2
           scrot -o -u desktop-smoke/01-hourly-wide.png
 
-          xdotool mousemove --window "$window_id" 1115 35 click 1
+          xdotool mousemove --window "$window_id" 1007 35 click 1
           sleep 1
           scrot -o -u desktop-smoke/02-overview-wide.png
 
-          xdotool mousemove --window "$window_id" 1015 35 click 1
+          xdotool mousemove --window "$window_id" 1171 35 click 1
           sleep 0.08
-          xdotool mousemove --window "$window_id" 1115 35 click 1
+          xdotool mousemove --window "$window_id" 1007 35 click 1
           sleep 0.08
-          xdotool mousemove --window "$window_id" 1015 35 click 1
+          xdotool mousemove --window "$window_id" 1171 35 click 1
           sleep 1
 
           xdotool mousemove --window "$window_id" 1190 700 click 3

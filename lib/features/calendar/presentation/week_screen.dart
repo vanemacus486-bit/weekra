@@ -17,6 +17,7 @@ import 'package:weekra/l10n/app_localizations.dart';
 part 'week/week_shared.dart';
 part 'week/week_layout_stage.dart';
 part 'week/week_toolbar.dart';
+part 'week/month_layout.dart';
 part 'week/overview_agenda.dart';
 part 'week/hourly_layout.dart';
 part 'week/hourly_chrome.dart';
@@ -49,6 +50,7 @@ class WeekScreen extends StatefulWidget {
 
 class _WeekScreenState extends State<WeekScreen> {
   late DateTime _weekStart;
+  late DateTime _monthStart;
   int _navigationDirection = 0;
   _WeekLayout _layout = _WeekLayout.grid;
   List<CalendarEvent> _events = [];
@@ -60,7 +62,9 @@ class _WeekScreenState extends State<WeekScreen> {
   @override
   void initState() {
     super.initState();
-    _weekStart = _timelineStart(_now(), widget.calendarSettings);
+    final now = _now();
+    _weekStart = _timelineStart(now, widget.calendarSettings);
+    _monthStart = DateTime(now.year, now.month);
   }
 
   @override
@@ -299,6 +303,18 @@ class _WeekScreenState extends State<WeekScreen> {
     if (offset == 0) {
       return;
     }
+    if (_layout == _WeekLayout.month) {
+      final target = DateTime(
+        _monthStart.year,
+        _monthStart.month + offset,
+      );
+      setState(() {
+        _navigationDirection = offset.sign;
+        _monthStart = target;
+        _weekStart = _timelineStart(target, widget.calendarSettings);
+      });
+      return;
+    }
     final dayOffset =
         widget.calendarSettings.anchorMode == CalendarAnchorMode.weekStart
         ? offset * DateTime.daysPerWeek
@@ -310,13 +326,18 @@ class _WeekScreenState extends State<WeekScreen> {
   }
 
   void _returnToToday() {
-    final target = _timelineStart(_now(), widget.calendarSettings);
-    if (_isSameDay(target, _weekStart)) {
+    final now = _now();
+    final target = _timelineStart(now, widget.calendarSettings);
+    final targetMonth = DateTime(now.year, now.month);
+    if (_isSameDay(target, _weekStart) &&
+        (_layout != _WeekLayout.month ||
+            _isSameDay(targetMonth, _monthStart))) {
       return;
     }
     setState(() {
       _navigationDirection = target.isAfter(_weekStart) ? 1 : -1;
       _weekStart = target;
+      _monthStart = targetMonth;
     });
   }
 
@@ -324,7 +345,17 @@ class _WeekScreenState extends State<WeekScreen> {
     if (_layout == layout) {
       return;
     }
-    setState(() => _layout = layout);
+    setState(() {
+      if (layout == _WeekLayout.month) {
+        final now = DateTime(_now().year, _now().month, _now().day);
+        final visibleEnd = _weekStart.add(const Duration(days: 7));
+        final anchor = !now.isBefore(_weekStart) && now.isBefore(visibleEnd)
+            ? now
+            : _weekStart.add(const Duration(days: 3));
+        _monthStart = DateTime(anchor.year, anchor.month);
+      }
+      _layout = layout;
+    });
   }
 
   @override
@@ -376,6 +407,7 @@ class _WeekScreenState extends State<WeekScreen> {
               children: [
                 _WeekToolbar(
                   weekStart: _weekStart,
+                  monthStart: _monthStart,
                   layout: _layout,
                   onPrevious: () => _moveTimeline(-1),
                   onNext: () => _moveTimeline(1),
@@ -434,6 +466,17 @@ class _WeekScreenState extends State<WeekScreen> {
                                 initialEnd: day.add(const Duration(hours: 10)),
                               ),
                             ),
+                            month: _MonthLayout(
+                              key: const PageStorageKey('month-view'),
+                              monthStart: _monthStart,
+                              events: allEvents,
+                              today: now,
+                              onEventTap: _openEvent,
+                              onCreate: (day) => _createEvent(
+                                initialStart: day.add(const Duration(hours: 9)),
+                                initialEnd: day.add(const Duration(hours: 10)),
+                              ),
+                            ),
                           ),
                         ),
                 ),
@@ -447,4 +490,3 @@ class _WeekScreenState extends State<WeekScreen> {
 
   DateTime _now() => widget.clock?.call() ?? DateTime.now();
 }
-

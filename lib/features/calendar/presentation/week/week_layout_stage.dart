@@ -31,11 +31,13 @@ class _WeekLayoutStage extends StatelessWidget {
     required this.layout,
     required this.hourly,
     required this.overview,
+    required this.month,
   });
 
   final _WeekLayout layout;
   final Widget hourly;
   final Widget overview;
+  final Widget month;
 
   @override
   Widget build(BuildContext context) {
@@ -67,8 +69,8 @@ class _WeekLayoutStage extends StatelessWidget {
       children: [
         layer(value: _WeekLayout.hourly, child: hourly),
         layer(value: _WeekLayout.grid, child: overview),
+        layer(value: _WeekLayout.month, child: month),
       ],
     );
   }
 }
-

@@ -7,7 +7,7 @@ Weekra is a calm, week-first calendar built with Flutter.
 The first version focuses on one job: letting people understand and edit their
 week quickly.
 
-- Overview day stream and seven-column Hourly layouts
+- Day stream, month calendar, and seven-column week layouts
 - Mobile and desktop layout switcher
 - Create, edit, move, and delete events
 - Navigate across days and return to today
@@ -70,7 +70,9 @@ script.
 The first UI slice is in place:
 
 - Timepage-inspired Overview stream and seven-column Hourly layouts
-- Overview / Hourly switching on phones, tablets, and desktops
+- Day / Month / Week switching on phones, tablets, and desktops
+- Timepage-inspired month grid with compact marker-led event rows, overflow
+  counts, and a date-only today marker
 - The Overview runs continuously by day, opening on today and extending past
   either end as you keep scrolling
 - A compact day strip with its own surface separates the weekday and date from
