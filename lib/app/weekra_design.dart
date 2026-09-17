@@ -24,10 +24,6 @@ abstract final class WeekraColors {
   /// The day strip sits deeper than the event area, the way a dark margin sits
   /// beside a lighter page. Today is marked by ink colour alone.
   static const dayStrip = Color(0xFF0B0C0E);
-
-  /// Unbooked stretches between two events sink below [overviewSurface] so free
-  /// time stays visible at a glance.
-  static const dayGap = Color(0xFF0B0C0E);
 }
 
 abstract final class WeekraMetrics {

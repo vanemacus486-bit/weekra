@@ -895,6 +895,28 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('uses compact marker-led event rows in the overview', (
+    tester,
+  ) async {
+    _useViewport(tester, const Size(390, 844));
+    final event = _eventOnToday('Compact overview event');
+    await tester.pumpWidget(
+      WeekraApp(
+        eventStore: _MemoryEventStore([event]),
+        locale: const Locale('en'),
+        enableAutomaticUpdates: false,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final row = find.byKey(Key('overview-event-${event.id}'));
+    final marker = find.byKey(Key('overview-event-marker-${event.id}'));
+    expect(row.hitTestable(), findsOneWidget);
+    expect(tester.getSize(row).height, 44);
+    expect(tester.getSize(marker), const Size(4, 36));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('the overview streams past a single week', (tester) async {
     _useViewport(tester, const Size(1280, 800));
     _useDesktopPlatform();
