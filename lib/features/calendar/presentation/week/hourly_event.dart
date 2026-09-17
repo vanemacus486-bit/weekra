@@ -252,30 +252,34 @@ class _GridEventState extends State<_GridEvent> {
                       behavior: HitTestBehavior.opaque,
                       dragStartBehavior: DragStartBehavior.down,
                       onTapDown: (details) {
-                        // Classify with the geometry the press actually landed
-                        // on. Selecting the event zooms the two hours around it
-                        // right afterwards, which slides the block out from
-                        // under the pointer — reading the intent here keeps a
-                        // press on the bottom edge from becoming a move.
+                        // Read the intent with the geometry the press actually
+                        // landed on, but do not select yet. Selecting zooms the
+                        // two hours around the event, and zooming on pointer-down
+                        // made the grid unfold under the pointer and fold back
+                        // afterwards; the intent is read here so a press on the
+                        // bottom edge cannot become a move either.
                         _pressIntent = _intentAt(
                           details.localPosition,
                           bodyOffset: bodyOffset,
                           bodyHeight: bodyHeight,
                         );
                         _hasPressIntent = true;
-                        onFocus();
                       },
                       onSecondaryTapDown: desktopPointers
                           ? (_) => onFocus()
                           : null,
-                      onTapUp: (details) => onTap(
-                        _globalRectFor(eventContext) ??
-                            Rect.fromCenter(
-                              center: details.globalPosition,
-                              width: 1,
-                              height: 1,
-                            ),
-                      ),
+                      onTapUp: (details) {
+                        // A confirmed tap is the only thing that zooms.
+                        onFocus();
+                        onTap(
+                          _globalRectFor(eventContext) ??
+                              Rect.fromCenter(
+                                center: details.globalPosition,
+                                width: 1,
+                                height: 1,
+                              ),
+                        );
+                      },
                       onSecondaryTapUp: desktopPointers
                           ? (details) => onSecondaryTap(
                               _globalRectFor(eventContext) ??

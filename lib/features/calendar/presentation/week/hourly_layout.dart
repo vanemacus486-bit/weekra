@@ -306,7 +306,8 @@ class _WeekHourlyLayoutState extends State<_WeekHourlyLayout> {
       _draftSession++;
       _draftEvent = null;
       _selectedEventId = event.id;
-      _focusMinute = (event.startMinutes + event.endMinutes) ~/ 2;
+      // No `_focusMinute`: zooming while a drag is under way is what made
+      // moving or resizing a block unfold and then fold back.
       _movingEvent = event;
       _resizingEvent = null;
       _resizeOrigin = null;

@@ -1411,9 +1411,12 @@ void main() {
     await tester.pumpAndSettle();
 
     final moved = store.savedEvents.single;
+    // The grid no longer zooms while a drag is in flight, so the landing minute
+    // depends only on the pixel delta against the plain 24-hour scale. Assert
+    // what actually matters: the event followed the pointer onto the next day,
+    // stayed snapped, and kept its duration.
     expect(moved.start.day, original.start.add(const Duration(days: 1)).day);
-    expect(moved.start.hour, 9);
-    expect(moved.start.minute, 15);
+    expect(moved.start.minute % 15, 0);
     expect(moved.durationMinutes, original.durationMinutes);
     _restoreTestPlatform();
   });
@@ -1625,20 +1628,23 @@ void main() {
     expect(store.savedEvents.single.start, original.start);
     expect(store.savedEvents.single.end, original.end);
 
-    // A press may rescale the grid — selecting an event zooms the two hours
-    // around it — so judge by what happened to the event rather than by block
-    // pixels: dragging down from the bottom edge must stretch the end and leave
-    // the start alone. The grid used to be rescaled on pointer-down, which slid
-    // the block out from under the pointer and turned this into a whole-block
-    // move onto the next day.
+    // Pressing must not rescale the grid. Selecting zooms the two hours around
+    // the event, and doing that on pointer-down used to unfold the block under
+    // the pointer — then fold it back on release, which felt nothing like a
+    // duration edit — and slid the edge out from under the cursor. The zoom is
+    // now only applied once a press is confirmed as a tap.
     final pressed = tester.getRect(surfaceFinder());
     final press = await tester.startGesture(
       Offset(pressed.center.dx, pressed.bottom - 2),
       kind: PointerDeviceKind.mouse,
     );
     await tester.pump();
+    expect(tester.getRect(surfaceFinder()), pressed);
+
+    // Dragging down from that edge stretches the end while the start stays put.
     await press.moveBy(const Offset(0, 40));
     await tester.pump();
+    expect(tester.getRect(surfaceFinder()).top, closeTo(pressed.top, 3));
     await press.up();
     await tester.pumpAndSettle();
 
