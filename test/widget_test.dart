@@ -940,12 +940,12 @@ void main() {
       return tester.widget<DecoratedBox>(surface).decoration as BoxDecoration;
     }
 
-    final yesterday = decorationFor(16);
     final today = decorationFor(17);
     final tomorrow = decorationFor(18);
-    expect(yesterday.color, isNot(today.color));
+    final dayAfterTomorrow = decorationFor(19);
     expect(today.color, isNot(tomorrow.color));
-    expect(yesterday.color, tomorrow.color);
+    expect(tomorrow.color, isNot(dayAfterTomorrow.color));
+    expect(today.color, dayAfterTomorrow.color);
     final todayBorder = today.border! as Border;
     expect(todayBorder.top.width, greaterThan(0));
     expect(tester.takeException(), isNull);
