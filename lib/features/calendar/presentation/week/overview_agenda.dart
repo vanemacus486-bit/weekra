@@ -107,7 +107,9 @@ class _WeekGridSummaryState extends State<_WeekGridSummary> {
               delegate: SliverChildBuilderDelegate((context, index) {
                 return dayRow(
                   day: _origin.add(Duration(days: index)),
-                  showTopRule: index > 0,
+                  // The first item in this sliver follows the final item in the
+                  // reverse sliver. It still needs a boundary above it.
+                  showTopRule: true,
                 );
               }, childCount: _futureDays),
             ),
@@ -211,6 +213,12 @@ class _AgendaDay extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final accent = Theme.of(context).colorScheme.primary;
+    final dayOrdinal =
+        DateTime.utc(day.year, day.month, day.day).millisecondsSinceEpoch ~/
+        Duration.millisecondsPerDay;
+    final surfaceColor = dayOrdinal.isEven
+        ? WeekraColors.overviewSurface
+        : WeekraColors.overviewSurfaceAlternate;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () => onCreate(day),
@@ -257,7 +265,11 @@ class _AgendaDay extends StatelessWidget {
             ),
             Expanded(
               child: DecoratedBox(
+                key: Key(
+                  'overview-day-surface-${day.year}-${day.month}-${day.day}',
+                ),
                 decoration: BoxDecoration(
+                  color: surfaceColor,
                   border: showTopRule
                       ? const Border(top: BorderSide(color: _line))
                       : null,
