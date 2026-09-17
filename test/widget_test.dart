@@ -919,6 +919,38 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('alternates day surfaces and keeps the today boundary', (
+    tester,
+  ) async {
+    _useViewport(tester, const Size(390, 844));
+    await tester.pumpWidget(
+      WeekraApp(
+        eventStore: _MemoryEventStore(),
+        locale: const Locale('en'),
+        clock: () => DateTime(2026, 9, 17, 10),
+        enableAutomaticUpdates: false,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    BoxDecoration decorationFor(int day) {
+      final surface = find.byKey(
+        Key('overview-day-surface-2026-9-$day'),
+      );
+      return tester.widget<DecoratedBox>(surface).decoration as BoxDecoration;
+    }
+
+    final yesterday = decorationFor(16);
+    final today = decorationFor(17);
+    final tomorrow = decorationFor(18);
+    expect(yesterday.color, isNot(today.color));
+    expect(today.color, isNot(tomorrow.color));
+    expect(yesterday.color, tomorrow.color);
+    final todayBorder = today.border! as Border;
+    expect(todayBorder.top.width, greaterThan(0));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('the overview streams past a single week', (tester) async {
     _useViewport(tester, const Size(1280, 800));
     _useDesktopPlatform();

@@ -21,6 +21,10 @@ abstract final class WeekraColors {
   /// so the event area and the day strip read as two separate columns.
   static const overviewSurface = Color(0xFF16181B);
 
+  /// Alternates with [overviewSurface] on adjacent agenda days. The small
+  /// luminance step separates days before the divider needs to do any work.
+  static const overviewSurfaceAlternate = Color(0xFF191B1E);
+
   /// The day strip sits deeper than the event area, the way a dark margin sits
   /// beside a lighter page. Today is marked by ink colour alone.
   static const dayStrip = Color(0xFF0B0C0E);
