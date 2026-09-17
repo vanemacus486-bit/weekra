@@ -103,20 +103,30 @@ class _FlowingDateSwitcherState extends State<_FlowingDateSwitcher>
   @override
   Widget build(BuildContext context) {
     final outgoingChild = _outgoingChild;
-    if (outgoingChild == null) {
-      return _FlowingDateLayer(
-        key: _layerKey(_currentChild),
-        horizontalOffset: 0,
-        clip: _FlowingDateClip.full,
-        clipExtent: 0,
-        interactive: true,
-        child: _currentChild,
-      );
-    }
-
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, child) {
+        // Keep one widget shape whether or not a move is running. Returning a
+        // bare layer while idle and a stack while sliding rebuilds the whole
+        // subtree on the first frame of every move, which re-lays the outgoing
+        // canvas out against the *new* window; the shared events then land on
+        // the same columns at both ends of the slide and are drawn twice.
+        if (outgoingChild == null) {
+          return Stack(
+            fit: StackFit.expand,
+            children: [
+              _FlowingDateLayer(
+                key: _layerKey(_currentChild),
+                horizontalOffset: 0,
+                clip: _FlowingDateClip.full,
+                clipExtent: 0,
+                interactive: true,
+                child: _currentChild,
+              ),
+            ],
+          );
+        }
+
         final progress = _flowCurve.transform(_controller.value);
         final outgoingOffset =
             _outgoingBeginOffset +

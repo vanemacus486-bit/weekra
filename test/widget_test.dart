@@ -225,6 +225,84 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('a date slide never draws the same event twice', (tester) async {
+    List<String> duplicatedVisibleEvents() {
+      final finder = find.byWidgetPredicate((widget) {
+        final key = widget.key;
+        return key is ValueKey<String> &&
+            key.value.startsWith('segment-hourly-event-');
+      });
+      final visible = <String, int>{};
+      for (final element in finder.evaluate()) {
+        final renderObject = element.renderObject;
+        if (renderObject is! RenderBox || !renderObject.hasSize) {
+          continue;
+        }
+        var rect = renderObject.localToGlobal(Offset.zero) & renderObject.size;
+        element.visitAncestorElements((ancestor) {
+          final widget = ancestor.widget;
+          if (widget is ClipRect && widget.clipper != null) {
+            final box = ancestor.renderObject;
+            if (box is RenderBox && box.hasSize) {
+              rect = rect.intersect(
+                widget.clipper!
+                    .getClip(box.size)
+                    .shift(box.localToGlobal(Offset.zero)),
+              );
+            }
+          }
+          return true;
+        });
+        if (rect.width > 0.5 && rect.height > 0.5) {
+          final key = (element.widget.key! as ValueKey<String>).value;
+          visible[key] = (visible[key] ?? 0) + 1;
+        }
+      }
+      return [
+        for (final entry in visible.entries)
+          if (entry.value > 1) '${entry.key} x${entry.value}',
+      ];
+    }
+
+    _useViewport(tester, const Size(1280, 800));
+    final now = DateTime(2026, 9, 14, 13, 30);
+    await tester.pumpWidget(
+      WeekraApp(
+        eventStore: _MemoryEventStore([
+          for (var day = 11; day <= 17; day++)
+            CalendarEvent(
+              id: 'shared-$day',
+              title: 'Shared $day',
+              start: DateTime(2026, 9, day, 9),
+              end: DateTime(2026, 9, day, 10),
+              color: const Color(0xFFF1776F),
+            ),
+        ]),
+        locale: const Locale('en'),
+        enableAutomaticUpdates: false,
+        clock: () => now,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    for (final button in const [
+      'timeline-next-day',
+      'timeline-previous-day',
+    ]) {
+      await tester.tap(find.byKey(Key(button)));
+      for (var frame = 0; frame < 40; frame++) {
+        await tester.pump(const Duration(milliseconds: 8));
+        expect(
+          duplicatedVisibleEvents(),
+          isEmpty,
+          reason: 'duplicate while $button animated on frame $frame',
+        );
+      }
+      await tester.pumpAndSettle();
+    }
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('single click starts at the containing whole hour', (
     tester,
   ) async {
