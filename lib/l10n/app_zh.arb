@@ -26,7 +26,6 @@
   "updateInstalling": "正在安装并重新启动…",
   "updateFailed": "Weekra 暂时无法自动更新，请稍后重试。",
   "dismiss": "关闭",
-  "openDay": "暂无安排",
   "newEventTitle": "新建日程",
   "editEventTitle": "编辑日程",
   "titleLabel": "标题",

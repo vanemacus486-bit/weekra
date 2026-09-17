@@ -26,7 +26,6 @@
   "updateInstalling": "⟦Installing the update and restarting Weekra…⟧",
   "updateFailed": "⟦Weekra could not complete the automatic update. Please try again after a little while.⟧",
   "dismiss": "⟦Dismiss message⟧",
-  "openDay": "⟦A wonderfully open and unscheduled day⟧",
   "newEventTitle": "⟦Create a brand-new event⟧",
   "editEventTitle": "⟦Edit this calendar event⟧",
   "titleLabel": "⟦Descriptive event title⟧",
