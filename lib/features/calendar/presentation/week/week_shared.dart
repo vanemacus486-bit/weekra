@@ -13,6 +13,11 @@ enum _WeekLayout { hourly, grid }
 
 enum _ResizeEdge { start, end }
 
+/// What pressing an event block is about to do. The gesture surface is taller
+/// than the visible block, so presses next to an edge must not silently fall
+/// back to a whole-block move; [none] keeps such a press inert instead.
+enum _DragIntent { none, move, resizeStart, resizeEnd }
+
 typedef _CreateEventCallback = Future<bool> Function({
   required DateTime start,
   required DateTime end,

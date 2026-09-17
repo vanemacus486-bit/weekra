@@ -61,8 +61,13 @@ class _GridEvent extends StatefulWidget {
 }
 
 class _GridEventState extends State<_GridEvent> {
-  _ResizeEdge? _hoveredResizeEdge;
-  _ResizeEdge? _activeResizeEdge;
+  /// How far outside the visible block a press still counts as an edge grab.
+  static const _edgeSlack = 6.0;
+  static const _minEdgeBand = 8.0;
+  static const _maxEdgeBand = 14.0;
+
+  _DragIntent _hoverIntent = _DragIntent.none;
+  _DragIntent _activeIntent = _DragIntent.none;
 
   Key get eventKey => widget.eventKey;
   CalendarEvent get event => widget.event;
@@ -90,37 +95,63 @@ class _GridEventState extends State<_GridEvent> {
   GestureDragEndCallback get onResizeEnd => widget.onResizeEnd;
   GestureDragCancelCallback get onResizeCancel => widget.onResizeCancel;
 
-  _ResizeEdge? _edgeAt(
+  _ResizeEdge? _resizeEdgeOf(_DragIntent intent) => switch (intent) {
+    _DragIntent.resizeStart => _ResizeEdge.start,
+    _DragIntent.resizeEnd => _ResizeEdge.end,
+    _ => null,
+  };
+
+  /// Decides what a press at [position] is going to do.
+  ///
+  /// The gesture surface reaches further than the visible block: short events
+  /// get transparent padding above and below so they stay clickable. Reading
+  /// those strips as "grabbed the body" is what turned a duration tweak into a
+  /// whole-block move. Only the middle of the block moves now; the block's own
+  /// edges plus a small slack just outside them resize; anything further out
+  /// stays inert.
+  _DragIntent _intentAt(
     Offset position, {
     required double bodyOffset,
     required double bodyHeight,
   }) {
-    if (!allowResize) {
-      return null;
-    }
     final bodyEnd = bodyOffset + bodyHeight;
-    if (position.dy < bodyOffset - 4 || position.dy > bodyEnd + 4) {
-      return null;
+    if (position.dy < bodyOffset || position.dy > bodyEnd) {
+      if (!allowResize) {
+        return _DragIntent.none;
+      }
+      final distance = position.dy < bodyOffset
+          ? bodyOffset - position.dy
+          : position.dy - bodyEnd;
+      if (distance > _edgeSlack) {
+        return _DragIntent.none;
+      }
+      return position.dy < bodyOffset
+          ? _DragIntent.resizeStart
+          : _DragIntent.resizeEnd;
     }
-    if (bodyHeight <= 18) {
-      return position.dy <= bodyOffset + bodyHeight / 2
-          ? _ResizeEdge.start
-          : _ResizeEdge.end;
+    if (!allowResize) {
+      return _DragIntent.move;
     }
-    if (position.dy <= bodyOffset + 8) {
-      return _ResizeEdge.start;
+    // Always leave a third of the block for moving, so even the shortest
+    // events stay draggable.
+    final band = math.min(
+      math.min(math.max(_minEdgeBand, bodyHeight * 0.28), _maxEdgeBand),
+      bodyHeight / 3,
+    );
+    if (position.dy <= bodyOffset + band) {
+      return _DragIntent.resizeStart;
     }
-    if (position.dy >= bodyEnd - 8) {
-      return _ResizeEdge.end;
+    if (position.dy >= bodyEnd - band) {
+      return _DragIntent.resizeEnd;
     }
-    return null;
+    return _DragIntent.move;
   }
 
-  void _setHoveredEdge(_ResizeEdge? edge) {
-    if (_hoveredResizeEdge == edge || _activeResizeEdge != null) {
+  void _setHoverIntent(_DragIntent intent) {
+    if (_hoverIntent == intent || _activeIntent != _DragIntent.none) {
       return;
     }
-    setState(() => _hoveredResizeEdge = edge);
+    setState(() => _hoverIntent = intent);
   }
 
   @override
@@ -193,12 +224,14 @@ class _GridEventState extends State<_GridEvent> {
                   builder: (eventContext) => MouseRegion(
                     cursor: !desktopPointers
                         ? MouseCursor.defer
-                        : _hoveredResizeEdge == null
-                        ? SystemMouseCursors.move
-                        : SystemMouseCursors.resizeUpDown,
+                        : switch (_hoverIntent) {
+                            _DragIntent.none => SystemMouseCursors.basic,
+                            _DragIntent.move => SystemMouseCursors.move,
+                            _ => SystemMouseCursors.resizeUpDown,
+                          },
                     onHover: desktopPointers
-                        ? (event) => _setHoveredEdge(
-                            _edgeAt(
+                        ? (event) => _setHoverIntent(
+                            _intentAt(
                               event.localPosition,
                               bodyOffset: bodyOffset,
                               bodyHeight: bodyHeight,
@@ -206,7 +239,7 @@ class _GridEventState extends State<_GridEvent> {
                           )
                         : null,
                     onExit: desktopPointers
-                        ? (_) => _setHoveredEdge(null)
+                        ? (_) => _setHoverIntent(_DragIntent.none)
                         : null,
                     child: GestureDetector(
                       key: eventKey,
@@ -237,56 +270,73 @@ class _GridEventState extends State<_GridEvent> {
                           : null,
                       onPanStart: desktopPointers
                           ? (details) {
-                              final edge = _edgeAt(
+                              final intent = _intentAt(
                                 details.localPosition,
                                 bodyOffset: bodyOffset,
                                 bodyHeight: bodyHeight,
                               );
                               setState(() {
-                                _activeResizeEdge = edge;
-                                _hoveredResizeEdge = edge;
+                                _activeIntent = intent;
+                                _hoverIntent = intent;
                               });
-                              if (edge == null) {
-                                onMoveStart();
-                              } else {
-                                onResizeStart(edge);
+                              switch (intent) {
+                                case _DragIntent.move:
+                                  onMoveStart();
+                                case _DragIntent.resizeStart:
+                                  onResizeStart(_ResizeEdge.start);
+                                case _DragIntent.resizeEnd:
+                                  onResizeStart(_ResizeEdge.end);
+                                case _DragIntent.none:
+                                  break;
                               }
                             }
                           : null,
                       onPanUpdate: desktopPointers
                           ? (details) {
-                              if (_activeResizeEdge == null) {
-                                onMoveUpdate(details.globalPosition);
-                              } else {
-                                onResizeUpdate(details);
+                              switch (_activeIntent) {
+                                case _DragIntent.move:
+                                  onMoveUpdate(details.globalPosition);
+                                case _DragIntent.resizeStart:
+                                case _DragIntent.resizeEnd:
+                                  onResizeUpdate(details);
+                                case _DragIntent.none:
+                                  break;
                               }
                             }
                           : null,
                       onPanEnd: desktopPointers
                           ? (details) {
-                              final edge = _activeResizeEdge;
+                              final intent = _activeIntent;
                               setState(() {
-                                _activeResizeEdge = null;
-                                _hoveredResizeEdge = null;
+                                _activeIntent = _DragIntent.none;
+                                _hoverIntent = _DragIntent.none;
                               });
-                              if (edge == null) {
-                                onMoveEnd();
-                              } else {
-                                onResizeEnd(details);
+                              switch (intent) {
+                                case _DragIntent.move:
+                                  onMoveEnd();
+                                case _DragIntent.resizeStart:
+                                case _DragIntent.resizeEnd:
+                                  onResizeEnd(details);
+                                case _DragIntent.none:
+                                  break;
                               }
                             }
                           : null,
                       onPanCancel: desktopPointers
                           ? () {
-                              final edge = _activeResizeEdge;
+                              final intent = _activeIntent;
                               setState(() {
-                                _activeResizeEdge = null;
-                                _hoveredResizeEdge = null;
+                                _activeIntent = _DragIntent.none;
+                                _hoverIntent = _DragIntent.none;
                               });
-                              if (edge == null) {
-                                onMoveCancel();
-                              } else {
-                                onResizeCancel();
+                              switch (intent) {
+                                case _DragIntent.move:
+                                  onMoveCancel();
+                                case _DragIntent.resizeStart:
+                                case _DragIntent.resizeEnd:
+                                  onResizeCancel();
+                                case _DragIntent.none:
+                                  break;
                               }
                             }
                           : null,
@@ -385,7 +435,7 @@ class _GridEventState extends State<_GridEvent> {
               ),
             ),
           ),
-          if (_hoveredResizeEdge case final edge?)
+          if (_resizeEdgeOf(_hoverIntent) case final edge?)
             PositionedDirectional(
               key: Key('event-resize-edge-${event.id}'),
               start: 5,

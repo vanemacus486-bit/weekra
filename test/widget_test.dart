@@ -1566,6 +1566,90 @@ void main() {
     _restoreTestPlatform();
   });
 
+  testWidgets('edges resize while the strip around a short block stays inert', (
+    tester,
+  ) async {
+    _useViewport(tester, const Size(900, 1000));
+    _useDesktopPlatform();
+    final now = DateTime.now();
+    final day = DateTime(
+      now.year,
+      now.month,
+      now.day,
+    ).subtract(const Duration(days: 3));
+    final original = CalendarEvent(
+      id: 'Short block',
+      title: 'Short block',
+      start: day.add(const Duration(hours: 9)),
+      end: day.add(const Duration(hours: 9, minutes: 15)),
+      color: const Color(0xFFFF7B6F),
+    );
+    final store = _MemoryEventStore([original]);
+    await tester.pumpWidget(
+      WeekraApp(
+        eventStore: store,
+        locale: const Locale('en'),
+        enableAutomaticUpdates: false,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    Finder surfaceFinder() =>
+        find.byKey(const Key('hourly-event-surface-Short block-0'));
+    Finder stripFinder() => find.byKey(const Key('hourly-event-Short block'));
+
+    // A short block is padded out to stay clickable, so its gesture surface is
+    // noticeably taller than the block you can see.
+    expect(
+      tester.getSize(stripFinder()).height,
+      greaterThan(tester.getSize(surfaceFinder()).height + 4),
+    );
+
+    Future<void> dragFrom(Offset from, Offset delta) async {
+      final gesture = await tester.startGesture(
+        from,
+        kind: PointerDeviceKind.mouse,
+      );
+      await gesture.moveBy(delta);
+      await tester.pump();
+      await gesture.up();
+      await tester.pumpAndSettle();
+    }
+
+    // That padding sits well outside the edge slack, so pressing it must do
+    // nothing at all. It used to read as "grabbed the body", which dragged the
+    // whole event to a new time and day.
+    final strip = tester.getRect(stripFinder());
+    await dragFrom(Offset(strip.center.dx, strip.top + 1), const Offset(0, 80));
+    expect(store.saveCalls, 0);
+    expect(store.savedEvents.single.start, original.start);
+    expect(store.savedEvents.single.end, original.end);
+
+    // Pressing the block's own bottom edge only stretches the end time.
+    final surface = tester.getRect(surfaceFinder());
+    final beforeEdge = store.savedEvents.single;
+    await dragFrom(
+      Offset(surface.center.dx, surface.bottom - 2),
+      const Offset(0, 40),
+    );
+    final resized = store.savedEvents.single;
+    expect(resized.start, beforeEdge.start);
+    expect(resized.end.isAfter(beforeEdge.end), isTrue);
+    expect(resized.start.day, original.start.day);
+
+    // Pressing the middle of the block still moves it to another day without
+    // touching its duration.
+    final beforeMove = tester.getRect(surfaceFinder());
+    await dragFrom(beforeMove.center, const Offset(200, 0));
+    final moved = store.savedEvents.single;
+    expect(moved.start.isAfter(resized.start), isTrue);
+    expect(
+      moved.end.difference(moved.start),
+      resized.end.difference(resized.start),
+    );
+    _restoreTestPlatform();
+  });
+
   testWidgets('edits an existing event', (tester) async {
     final store = _MemoryEventStore([_event('Original title')]);
     await tester.pumpWidget(
