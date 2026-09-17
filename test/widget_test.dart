@@ -368,7 +368,7 @@ void main() {
     expect(dayEndRect.bottom, closeTo(grid.bottom, .1));
   });
 
-  testWidgets('fits all 24 hours and magnifies a short event in place', (
+  testWidgets('fits all 24 hours and keeps the scale steady on click', (
     tester,
   ) async {
     _useViewport(tester, const Size(1280, 800));
@@ -402,16 +402,19 @@ void main() {
       findsNothing,
     );
 
+    // Selecting an event used to zoom the two hours around it, which rescaled
+    // the whole timeline and relaid out every block on the grid — the bulk of
+    // what a click cost on a busy week. The scale must now hold still.
     final surface = find.byKey(const Key('hourly-event-surface-focus-short-0'));
-    final overviewHeight = tester.getRect(surface).height;
+    final beforeTap = tester.getRect(surface);
     await tester.tap(
       find.byKey(const Key('hourly-event-focus-short')),
       kind: PointerDeviceKind.mouse,
     );
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const Key('timeline-focus-lens')), findsOneWidget);
-    expect(tester.getRect(surface).height, greaterThan(overviewHeight * 2));
+    expect(find.byKey(const Key('timeline-focus-lens')), findsNothing);
+    expect(tester.getRect(surface), beforeTap);
     _restoreTestPlatform();
   });
 

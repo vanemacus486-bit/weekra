@@ -295,7 +295,11 @@ class _WeekHourlyLayoutState extends State<_WeekHourlyLayout> {
       _draftSession++;
       _draftEvent = null;
       _selectedEventId = event.id;
-      _focusMinute = (event.startMinutes + event.endMinutes) ~/ 2;
+      // Deliberately no `_focusMinute`. Zooming the two hours around the event
+      // rescales the whole timeline, so every block on the grid relays out:
+      // measured at ~40ms of extra work on the first frame after a click, and
+      // much worse once the result has to be repainted. Short events stay
+      // readable through the details sheet instead.
     });
     HapticFeedback.selectionClick();
   }

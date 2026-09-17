@@ -200,15 +200,15 @@ class _GridEventState extends State<_GridEvent> {
         : isShort
         ? 3.0
         : 6.0;
-    return AnimatedPositionedDirectional(
+    // Plain PositionedDirectional, not Animated: every block's top and height
+    // change whenever the focused two hours are zoomed, and animating that
+    // meant dozens of gradient-and-shadow blocks re-laying out every frame for
+    // 180ms after a single click. The slide is not worth the cost.
+    return PositionedDirectional(
       start: start,
       top: positionedTop,
       width: laneWidth,
       height: outerHeight,
-      duration: isManipulating || isResizing
-          ? Duration.zero
-          : WeekraMotion.resolve(context, WeekraMotion.control),
-      curve: WeekraMotion.emphasized,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
