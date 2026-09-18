@@ -436,7 +436,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 90));
     final midway = tester.getRect(thumb).left;
-    expect(midway, greaterThan(start));
+    expect(midway, lessThan(start));
     await tester.tap(find.byKey(const Key('week-layout-hourly')));
     await tester.pump();
     expect(tester.getRect(thumb).left, closeTo(midway, .1));
@@ -922,6 +922,60 @@ void main() {
       find.byKey(const Key('week-grid-layout')).hitTestable(),
       findsOneWidget,
     );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('shows a Monday-first month with compact event rows', (
+    tester,
+  ) async {
+    _useViewport(tester, const Size(1280, 800));
+    final now = DateTime(2026, 9, 17, 10, 32);
+    CalendarEvent event(String id, int hour) {
+      final start = DateTime(2026, 9, 17, hour);
+      return CalendarEvent(
+        id: id,
+        title: 'Event $id',
+        start: start,
+        end: start.add(const Duration(hours: 1)),
+        color: const Color(0xFFF1776C),
+      );
+    }
+
+    await tester.pumpWidget(
+      WeekraApp(
+        eventStore: _MemoryEventStore([
+          event('one', 8),
+          event('two', 10),
+          event('three', 13),
+          event('four', 15),
+          event('five', 18),
+        ]),
+        locale: const Locale('en'),
+        clock: () => now,
+        enableAutomaticUpdates: false,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Day'), findsOneWidget);
+    expect(find.text('Month'), findsOneWidget);
+    expect(find.text('Week'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('week-layout-month')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('month-layout')).hitTestable(), findsOneWidget);
+    expect(find.byKey(const ValueKey('month-day-20260831')), findsOneWidget);
+    expect(find.byKey(const ValueKey('month-day-20261004')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('month-event-one-20260917')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('month-more-20260917')), findsOneWidget);
+    expect(find.text('+2'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('timeline-next-day')));
+    await tester.pumpAndSettle();
+    expect(find.text('October 2026'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

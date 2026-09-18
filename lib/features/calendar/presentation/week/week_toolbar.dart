@@ -3,6 +3,7 @@ part of '../week_screen.dart';
 class _WeekToolbar extends StatelessWidget {
   const _WeekToolbar({
     required this.weekStart,
+    required this.monthStart,
     required this.layout,
     required this.onPrevious,
     required this.onNext,
@@ -12,6 +13,7 @@ class _WeekToolbar extends StatelessWidget {
   });
 
   final DateTime weekStart;
+  final DateTime monthStart;
   final _WeekLayout layout;
   final VoidCallback onPrevious;
   final VoidCallback onNext;
@@ -41,7 +43,9 @@ class _WeekToolbar extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Text(
-          _weekLabel(materialL10n, weekStart),
+          layout == _WeekLayout.month
+              ? materialL10n.formatMonthYear(monthStart)
+              : _weekLabel(materialL10n, weekStart),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: const TextStyle(
@@ -77,6 +81,7 @@ class _WeekToolbar extends StatelessWidget {
           );
           final navigation = _WeekNavigation(
             compact: todayLabelWidth > (constraints.maxWidth < 420 ? 76 : 120),
+            layout: layout,
             onPrevious: onPrevious,
             onToday: onToday,
             onNext: onNext,
@@ -138,12 +143,14 @@ class _WeekToolbar extends StatelessWidget {
 class _WeekNavigation extends StatelessWidget {
   const _WeekNavigation({
     required this.compact,
+    required this.layout,
     required this.onPrevious,
     required this.onToday,
     required this.onNext,
   });
 
   final bool compact;
+  final _WeekLayout layout;
   final VoidCallback onPrevious;
   final VoidCallback onToday;
   final VoidCallback onNext;
@@ -159,7 +166,9 @@ class _WeekNavigation extends StatelessWidget {
           WeekraIconButton(
             key: const Key('timeline-previous-day'),
             onPressed: onPrevious,
-            tooltip: l10n.previousWeekTooltip,
+            tooltip: layout == _WeekLayout.month
+                ? l10n.previousMonthTooltip
+                : l10n.previousWeekTooltip,
             icon: const Icon(Icons.chevron_left_rounded, size: 20),
           ),
           if (compact)
@@ -175,7 +184,9 @@ class _WeekNavigation extends StatelessWidget {
           WeekraIconButton(
             key: const Key('timeline-next-day'),
             onPressed: onNext,
-            tooltip: l10n.nextWeekTooltip,
+            tooltip: layout == _WeekLayout.month
+                ? l10n.nextMonthTooltip
+                : l10n.nextWeekTooltip,
             icon: const Icon(Icons.chevron_right_rounded, size: 20),
           ),
         ],
@@ -277,35 +288,61 @@ class _WeekLayoutSwitcher extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     const labelStyle = TextStyle(fontSize: 12, fontWeight: FontWeight.w700);
-    final labelWidth = math.max(
-      _singleLineTextWidth(context, l10n.weekLayoutHourly, labelStyle),
-      _singleLineTextWidth(context, l10n.weekLayoutGrid, labelStyle),
-    );
-    final width = showLabels ? math.max(204.0, labelWidth * 2 + 108) : 88.0;
+    final labelWidth = [
+      l10n.calendarViewDay,
+      l10n.calendarViewMonth,
+      l10n.calendarViewWeek,
+    ].map(
+      (label) => _singleLineTextWidth(context, label, labelStyle),
+    ).reduce(math.max);
+    final width = showLabels ? math.max(246.0, labelWidth * 3 + 150) : 132.0;
     return Semantics(
       container: true,
-      label: l10n.weekLayoutPickerLabel,
+      label: l10n.calendarViewPickerLabel,
       child: GlassSegmentedControl(
         width: width,
-        selectedIndex: layout == _WeekLayout.hourly ? 0 : 1,
-        onChanged: (index) =>
-            onChanged(index == 0 ? _WeekLayout.hourly : _WeekLayout.grid),
+        selectedIndex: switch (layout) {
+          _WeekLayout.grid => 0,
+          _WeekLayout.month => 1,
+          _WeekLayout.hourly => 2,
+        },
+        onChanged: (index) => onChanged(
+          switch (index) {
+            0 => _WeekLayout.grid,
+            1 => _WeekLayout.month,
+            _ => _WeekLayout.hourly,
+          },
+        ),
         children: [
-          _WeekLayoutOption(
-            key: const Key('week-layout-hourly'),
-            icon: Icons.view_week_outlined,
-            label: showLabels ? l10n.weekLayoutHourly : null,
-            semanticLabel: l10n.weekLayoutHourly,
-            selected: layout == _WeekLayout.hourly,
-            onTap: () => onChanged(_WeekLayout.hourly),
+          KeyedSubtree(
+            key: const Key('week-layout-day'),
+            child: _WeekLayoutOption(
+              key: const Key('week-layout-grid'),
+              icon: Icons.calendar_view_day_outlined,
+              label: showLabels ? l10n.calendarViewDay : null,
+              semanticLabel: l10n.calendarViewDay,
+              selected: layout == _WeekLayout.grid,
+              onTap: () => onChanged(_WeekLayout.grid),
+            ),
           ),
           _WeekLayoutOption(
-            key: const Key('week-layout-grid'),
-            icon: Icons.grid_view_rounded,
-            label: showLabels ? l10n.weekLayoutGrid : null,
-            semanticLabel: l10n.weekLayoutGrid,
-            selected: layout == _WeekLayout.grid,
-            onTap: () => onChanged(_WeekLayout.grid),
+            key: const Key('week-layout-month'),
+            icon: Icons.calendar_month_outlined,
+            label: showLabels ? l10n.calendarViewMonth : null,
+            semanticLabel: l10n.calendarViewMonth,
+            selected: layout == _WeekLayout.month,
+            onTap: () => onChanged(_WeekLayout.month),
+          ),
+          KeyedSubtree(
+            key: const Key('week-layout-week'),
+            child: _WeekLayoutOption(
+              key: const Key('week-layout-hourly'),
+              icon: Icons.view_week_outlined,
+              label: showLabels ? l10n.calendarViewWeek : null,
+              semanticLabel: l10n.calendarViewWeek,
+              selected: layout == _WeekLayout.hourly,
+              onTap: () => onChanged(_WeekLayout.hourly),
+            ),
           ),
         ],
       ),
