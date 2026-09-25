@@ -22,7 +22,7 @@ on:
       - ".github/workflows/android-apk.yml"
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: android-apk-${{ github.ref }}
@@ -65,10 +65,27 @@ jobs:
       - name: Prepare download filename
         run: cp build/app/outputs/flutter-apk/app-release.apk Weekra-Android.apk
 
-      - name: Upload APK
+      - name: Upload workflow artifact
         uses: actions/upload-artifact@v4
         with:
           name: weekra-android-release
           path: Weekra-Android.apk
           if-no-files-found: error
           retention-days: 90
+
+      - name: Publish APK to GitHub Release
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          APP_VERSION="$(awk '/^version:/ {print $2}' pubspec.yaml)"
+          RELEASE_TAG="v${APP_VERSION%%+*}"
+
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" Weekra-Android.apk --clobber
+          else
+            gh release create "$RELEASE_TAG" Weekra-Android.apk \
+              --target "$GITHUB_SHA" \
+              --title "Weekra ${APP_VERSION%%+*}" \
+              --notes "Weekra Android release."
+          fi
